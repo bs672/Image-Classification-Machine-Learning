@@ -1,5 +1,6 @@
-# Ignoring .DS_Store
+# Ignoring .DS_Store and data sets
 .DS_Store
+*.csv
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
