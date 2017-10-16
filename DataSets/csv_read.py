@@ -20,6 +20,7 @@ def unittests():
     assert s is not None, 'Missing Seed.csv'
     assert g.shape == (7064950, 2), 'Graph has wrong size: {} should be (7064950, 2)'.format(g.shape)
     assert g_s.shape == (6000, 6000), 'G_S has wrong size: {} should be (6000,6000)'.format(g_s.shape)
+    assert check_symmetric(g_s), 'G_S is not symmetric'
     assert e.shape == (10000,1084), 'Extracted_features has wrong size: {} should be (10000,1084)'.format(e.shape)
     assert s.shape == (60,2), 'Seed has wrong size: {} should be (60,2)'.format(s.shape)
     print('Passed')
@@ -30,21 +31,28 @@ def unittests():
 def load_csv(fname):
     if os.path.isfile(fname):
         return np.loadtxt(fname, delimiter=',')
+    elif os.path.isfile(os.path.join('DataSets',fname)):
+        return np.loadtxt(os.path.join('DataSets',fname), delimiter=',')
     else:
         print('{} not in DataSets folder.'.format(fname))
         return None
+def check_symmetric(a, tol=1e-8):
+    return np.allclose(a, a.T, atol=tol)
 
 def load_graph(shape_match=False):
     if shape_match:
-        if os.path.isfile('Graph_Matrix.csv'):
-            return load_csv('Graph_Matrix.csv')
+        preload = load_csv('Graph_Matrix.csv')
+        if preload is not None:
+            return preload
         else:
             # Outputs a (6000, 6000) data sets with the similarity values
             # Note that this is 2.5 times the regular size of G
             g = np.array(load_csv('Graph.csv'), dtype='int')
-            output = np.zeros((6000, 6000), dtype='int')
+            output = np.identity(6000, dtype='int')
+            # Identity used because we should consider a point to be similar to itself
             for edge in g:
                 output[edge-1] = 1
+            print("Saving new similarity values as a matrix: Graph_Matrix.csv")
             np.savetxt('Graph_Matrix.csv',  np.asarray(output), delimiter=",")
             return output
     else:
