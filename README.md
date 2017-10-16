@@ -8,6 +8,10 @@ They will not actually be on GitHub due to size, but fileread functions will be 
 ## Documents
 All documents, e.g. project reports, should be placed here.
 
+## Links
+Project Description: https://confluence.cornell.edu/pages/viewpage.action?pageId=348617855   
+Kaggle Page: https://www.kaggle.com/c/cs4786fa17-competition1  
+
 ## Modules
 All implementations of algorithms, specialized for this challenge, should be placed here.   
 
