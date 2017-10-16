@@ -45,19 +45,19 @@ def load_graph(shape_match=False):
     if shape_match:
         preload = load_csv('Graph_Matrix.csv')
         if preload is not None:
-            print("Average Similarity : {}".format((preload.sum())/(6000.0**2)))
+            # print("Average Similarity : {}".format((preload.sum())/(6000.0**2)))
             return preload
         else:
             # Outputs a (6000, 6000) data sets with the similarity values
             # Note that this is 2.5 times the regular size of G
             g = np.array(load_csv('Graph.csv'), dtype='int')
-            print("Average Similarity should be : {}".format((7064950+6000)/(6000.0**2)))
+            # print("Average Similarity should be : {}".format((7064950+6000)/(6000.0**2)))
             output = np.identity(6000, dtype='int')
             # Identity used because we should consider a point to be similar to itself
             for edge in g:
                 output[edge[0]-1, edge[1]-1] = 1
             print("Saving new similarity values as a matrix: Graph_Matrix.csv")
-            print("Average Similarity : {}".format(output.sum()/(6000.0**2)))
+            # print("Average Similarity : {}".format(output.sum()/(6000.0**2)))
             np.savetxt('Graph_Matrix.csv',  np.asarray(output), delimiter=",", fmt='%d')
             return output
     else:
@@ -69,10 +69,41 @@ def load_extracted_features():
 def load_seed():
     return np.array(load_csv('Seed.csv'), dtype='int')
 
-def build_training_data(summed=True):
-    g = load_graph()
-    f = load_extracted_features()
-    return
+# Makes a data generator for classification
+def generate_training_data(nums = 128000):
+    g = load_graph(shape_match = True)
+    f = load_extracted_features()[:6000] # set the first 5120 features for training
+    input_shape = (2,1084)
+    inputs = np.empty(
+        (nums, ) + input_shape)
+    outputs = np.empty(
+        (nums, ))
+    batch_index = 0
+    for point in np.random.random_integers(0, 5999, (nums,2)):
+        inputs[batch_index] = np.array([f[point[0]] , f[point[1]]])
+        outputs[batch_index] = g[point[0], point[1]]
+        batch_index += 1
+    return inputs,outputs
+
+
+def generate_validation_data(nums=1280):
+    g = load_graph(shape_match = True)
+    f = load_extracted_features()[:6000] # set the first 5120 features for training
+    input_shape = (2,1084)
+    inputs = np.empty(
+        (nums, ) + input_shape)
+    outputs = np.empty(
+        (nums))
+    batch_index = 0
+    for point in np.random.random_integers(0, 5999, (nums,2)):
+        inputs[batch_index] = np.array([f[point[0]] , f[point[1]]])
+        outputs[batch_index] = g[point[0], point[1]]
+        batch_index += 1
+
+    return inputs,outputs
+
+
+
 #TODO implement save labels
 
 if __name__ == '__main__':
