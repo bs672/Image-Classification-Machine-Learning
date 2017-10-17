@@ -31,6 +31,7 @@ from csv_read import load_extracted_features, load_graph, load_seed
 
 X = load_extracted_features()
 seeds = load_seed()
+print(seeds.shape)
 
 n_samples, n_features = X.shape
 
@@ -58,6 +59,7 @@ def plt_PCA(X) :
     plt.tight_layout()
     plt.show()
 
+print("Running PCA on Extracted_Features")
 plt_PCA(X)
 
 
@@ -77,9 +79,11 @@ X_std = StandardScaler().fit_transform(X)
 
 
 # Load graph will make the 6000x6000 similarity matrix
+print("Loading Similarity Matrix")
 matrix = load_graph(shape_match=True)
+print("Loaded Similarity Matrix, shape {}".format(matrix.shape))
 # data = data.values
-
+#
 # n = max(max(i, j) for i, j in data) # Get size of matrix
 # print(n)
 # matrix = [[0] * n for i in range(n)]
@@ -96,22 +100,25 @@ matrix = load_graph(shape_match=True)
 
 # choose n_features for graph embedding
 k = 1000
-
+print("Using {} features for Spectral Embedding".format(k))
 spectral = SpectralEmbedding(n_components=k, eigen_solver='arpack', affinity="precomputed")
+print("Ran Spectral Embedding")
 X_sp = spectral.fit_transform(matrix)
+print("Fit and transformed similarity matrix, X_sp shape {}".format(X_sp.shape))
 
 
 
 # Can use rcca.CCACrossValidate for hyperpararmeter search
+print("Running CCA on Similarity Matrix and Feature Values")
 cca = rcca.CCA(kernelcca = False, reg = 0., numCC = 1000)
-cor = cca.train([X[:6000].values, X_sp])
+cor = cca.train([X[:6000], X_sp])
 
 X_pred = X[6000:]
 X_train = X[:6000]
-X_ = (X_pred - X_train.mean()).values
+X_ = (X_pred - X_train.mean())
 X_comb = np.dot(X_, cor.ws[0])
 
-X_comb.shape
+print("Combined Shape {}".format(X_comb.shape))
 plt_PCA(X_comb)
 
 # Scale and visualize the embedding vectors
@@ -161,14 +168,14 @@ def plot_embedding_test(X, y, title=None):
         # only print thumbnails with matplotlib > 1.0
         shown_images = np.array([[1., 1.]])  # just something big
         for k in range(seeds.shape[0]):
-            i = seeds[0][k]
+            i = seeds[k,0]
             dist = np.sum((X[i] - shown_images) ** 2, 1)
 #             if np.min(dist) < 4e-3:
 #                 # don't show points that are too close
 #                 continue
             shown_images = np.r_[shown_images, [X[i]]]
             imagebox = offsetbox.AnnotationBbox(
-                offsetbox.OffsetImage(digits.images[seeds[1][k]], cmap=plt.cm.gray_r),
+                offsetbox.OffsetImage(digits.images[seeds[k,1]], cmap=plt.cm.gray_r),
                 X[i])
             ax.add_artist(imagebox)
 
@@ -189,7 +196,7 @@ X_tsne = tsne.fit_transform(X_comb)
 
 # In[171]:
 
-
+print("Computing KMeans embedding")
 kmeans = KMeans(init='k-means++', n_clusters=10, n_init=10)
 kmeans.fit(X_tsne)
 y = kmeans.labels_
@@ -200,14 +207,14 @@ y = kmeans.labels_
 
 digits = load_digits(n_class= 10)
 
-plot_embedding(X_tsne, y,
-               "t-SNE embedding of the digits (time %.2fs)" %
-               (time() - t0))
-
-plot_embedding_test(X_tsne, y,
-               "t-SNE embedding of the digits (time %.2fs)" %
-               (time() - t0))
-plt.show()
+# plot_embedding(X_tsne, y,
+#                "t-SNE embedding of the digits (time %.2fs)" %
+#                (time() - t0))
+#
+# plot_embedding_test(X_tsne, y,
+#                "t-SNE embedding of the digits (time %.2fs)" %
+#                (time() - t0))
+# plt.show()
 
 
 # In[121]:
@@ -236,17 +243,17 @@ y = kmeans.labels_
 
 # In[ ]:
 
-
-digits = load_digits(n_class= 10)
-
-plot_embedding(X_tsne, y,
-               "t-SNE embedding of the digits (time %.2fs)" %
-               (time() - t0))
-
-plot_embedding_test(X_tsne, y,
-               "t-SNE embedding of the digits (time %.2fs)" %
-               (time() - t0))
-plt.show()
+#
+# digits = load_digits(n_class= 10)
+#
+# plot_embedding(X_tsne, y,
+#                "t-SNE embedding of the digits (time %.2fs)" %
+#                (time() - t0))
+#
+# plot_embedding_test(X_tsne, y,
+#                "t-SNE embedding of the digits (time %.2fs)" %
+#                (time() - t0))
+# plt.show()
 
 
 # In[174]:
@@ -269,7 +276,11 @@ metrics.completeness_score(seeds[1], label_pred)
 import sklearn.decomposition
 print("Computing PCA projection")
 X_pca = TruncatedSVD(n_components=2).fit_transform(X_comb)
-plot_embedding(X_pca, y,
-               "Principal Components projection of the digits (time %.2fs)" %
-               (time() - t0))
-plt.show()
+# plot_embedding(X_pca, y,
+#                "Principal Components projection of the digits (time %.2fs)" %
+#                (time() - t0))
+# plt.show()
+
+
+
+# CURRENTLY A LOT OF ERROR WITH PRINTING

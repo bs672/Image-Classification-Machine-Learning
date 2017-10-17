@@ -38,6 +38,8 @@ def load_csv(fname):
         print('{} not in DataSets folder.'.format(fname))
         return None
 
+# def save_csv(fname, values):
+
 def check_symmetric(a, tol=1e-8):
     return np.allclose(a, a.T, atol=tol)
 
@@ -70,35 +72,61 @@ def load_seed():
     return np.array(load_csv('Seed.csv'), dtype='int')
 
 # Makes a data generator for classification
-def generate_training_data(nums = 128000):
-    g = load_graph(shape_match = True)
-    f = load_extracted_features()[:6000] # set the first 5120 features for training
+def generate_training_data(nums=5120):
+    g = load_graph(shape_match = True)[:nums,:nums]
+    f = load_extracted_features()[:nums] # set the first 5120 features for training
     input_shape = (2,1084)
     inputs = np.empty(
-        (nums, ) + input_shape)
+        (nums**2, ) + input_shape)
     outputs = np.empty(
-        (nums, ))
+        (nums**2, ))
     batch_index = 0
-    for point in np.random.random_integers(0, 5999, (nums,2)):
-        inputs[batch_index] = np.array([f[point[0]] , f[point[1]]])
-        outputs[batch_index] = g[point[0], point[1]]
-        batch_index += 1
+    for i in range(nums):
+        for j in range(nums):
+            inputs[batch_index] = np.array([f[i] , f[j]])
+            outputs[batch_index] = g[i, j]
+            batch_index += 1
     return inputs,outputs
 
 
-def generate_validation_data(nums=1280):
-    g = load_graph(shape_match = True)
-    f = load_extracted_features()[:6000] # set the first 5120 features for training
+# Makes a data generator for classification
+def training_data_generator(nums=5120,batch_size=128):
+    g = load_graph(shape_match = True)[:nums,:nums]
+    f = load_extracted_features()[:nums] # set the first 5120 features for training
     input_shape = (2,1084)
     inputs = np.empty(
-        (nums, ) + input_shape)
+        (batch_size, ) + input_shape)
     outputs = np.empty(
-        (nums))
-    batch_index = 0
-    for point in np.random.random_integers(0, 5999, (nums,2)):
-        inputs[batch_index] = np.array([f[point[0]] , f[point[1]]])
-        outputs[batch_index] = g[point[0], point[1]]
+        (batch_size, ))
+    batch_index, i, j = 0, 0, 0
+    while True:
+        inputs[batch_index] = np.array([f[i] , f[j]])
+        outputs[batch_index] = g[i, j]
         batch_index += 1
+        i += 1
+        if not (i % nums):
+            i = 0
+            j = (j + 1) % nums
+        if batch_index >= batch_size:
+            batch_index = 0
+            yield inputs, outputs
+    return inputs,outputs
+
+
+def generate_validation_data(nums=880):
+    g = load_graph(shape_match = True)[(6000-nums):,(6000-nums):]
+    f = load_extracted_features()[(6000-nums):6000] # set the first 5120 features for training
+    input_shape = (2,1084)
+    inputs = np.empty(
+        (nums**2, ) + input_shape)
+    outputs = np.empty(
+        (nums**2, ))
+    batch_index = 0
+    for i in range(nums):
+        for j in range(nums):
+            inputs[batch_index] = np.array([f[i] , f[j]])
+            outputs[batch_index] = g[i, j]
+            batch_index += 1
 
     return inputs,outputs
 
