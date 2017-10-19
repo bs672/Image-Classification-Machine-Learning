@@ -1,3 +1,6 @@
 Explained variance percentage graph shows that about top 20 eigenvectors account for > 80% variance
 2 kids of preliminary labelings - 1) distance from mean of cluster to each of the seed groups. 
     2) distance from mean of cluster to each of the seed similarity groups
+
+TODO:
+    Basic supervised model
