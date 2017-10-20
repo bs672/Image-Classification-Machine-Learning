@@ -1,6 +1,9 @@
 Explained variance percentage graph shows that about top 20 eigenvectors account for > 80% variance
 2 kids of preliminary labelings - 1) distance from mean of cluster to each of the seed groups. 
     2) distance from mean of cluster to each of the seed similarity groups
+Accuracy went up from 4% to 26% after using 30 components instead of 5. down to 9% at 100 components. Shoulder probably around 15
 
 TODO:
     Basic supervised model
+    Seed_sets extended using similarity graph (if improvement then that means seeds are outliers in their digit class)
+    Scale by eigenvalue to get more realistic difference estimate
