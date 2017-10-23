@@ -1,6 +1,7 @@
 import numpy as np
 import os
 import pandas as pd
+from sklearn.decomposition import PCA
 
 """
     Visible functions:
@@ -74,6 +75,22 @@ def load_graph(fname='Graph', shape_match=False):
 def load_extracted_features():
     return load_csv('Extracted_features.csv')
 
+# Loads extracted features with PCA selected k features
+def load_extracted_features_PCA(k=999):
+    fname = "Extracted_features_PCA{}.csv".format(k)
+    preload = load_csv(fname)
+    if preload is not None:
+        return preload
+    else:
+        print("Running PCA on Extracted Features, keeping {} important components".format(k))
+        pca = PCA(n_components=k)
+        X = load_extracted_features()
+        X_new = pca.fit_transform(X)
+        print("New shape {}".format(X_new.shape))
+        assert X_new.shape == (X.shape[0],k), "New shape {} should be {}".format(X_new.shape,(X.shape[0],k))
+        np.savetxt(fname,  np.asarray(X_new), delimiter=",", fmt='%.4f')
+        return X_new
+
 def load_seed():
     return np.array(load_csv('Seed.csv'), dtype='int')
 
@@ -120,4 +137,5 @@ if __name__ == '__main__':
     print("                               Doesn't need to include .csv in fname")
     print("                               Will be saved into Labels/fname")
     print("Running Unit Tests (This will take a while): ...")
-    unittests()
+    load_extracted_features_PCA(k=999)
+    # unittests()
