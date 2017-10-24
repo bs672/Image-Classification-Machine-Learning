@@ -72,19 +72,28 @@ def load_graph(fname='Graph', shape_match=False):
     else:
         return np.array(load_csv(fname+'.csv'), dtype='int')
 
-def load_extracted_features():
+def load_extracted_features(onlyseeds=False):
+    if onlyseeds:
+        X = load_csv('Extracted_features.csv')
+        S = load_seed()
+        output = np.zeros((60,1084))
+        i = 0;
+        for index, label in S:
+            output[i] = X[index]
+            i += 1
+        return output
     return load_csv('Extracted_features.csv')
 
 # Loads extracted features with PCA selected k features
-def load_extracted_features_PCA(k=999):
-    fname = "Extracted_features_PCA{}.csv".format(k)
+def load_extracted_features_PCA(k=999, onlyseeds=False):
+    fname = "Extracted_features_PCA{}{}.csv".format(k, ('_Seeds' if onlyseeds else ''))
     preload = load_csv(fname)
     if preload is not None:
         return preload
     else:
         print("Running PCA on Extracted Features, keeping {} important components".format(k))
         pca = PCA(n_components=k)
-        X = load_extracted_features()
+        X = load_extracted_features( onlyseeds = onlyseeds )
         X_new = pca.fit_transform(X)
         print("New shape {}".format(X_new.shape))
         assert X_new.shape == (X.shape[0],k), "New shape {} should be {}".format(X_new.shape,(X.shape[0],k))
@@ -94,10 +103,27 @@ def load_extracted_features_PCA(k=999):
 def load_seed():
     return np.array(load_csv('Seed.csv'), dtype='int')
 
+# Creates adjacency matrix for seeds, 1 if both have same label
+def load_seed_matrix(fname='Seed_Matrix'):
+    preload = load_csv(fname+'.csv')
+    if preload is not None:
+        return preload
+    else:
+        s = load_seed()
+        nums = s.shape[0]
+        output = np.zeros((nums, nums), dtype='int')
+        for i in range(nums):
+            for j in range(nums):
+                label1, label2 = s[i,1], s[j,1]
+                output[i,j] = int(s[i,1]==s[j,1])
+        assert check_symmetric(output), 'Seed Matrix should be symmetric'
+        np.savetxt(fname+'.csv',  np.asarray(output), delimiter=",", fmt='%d')
+        return output
+
 # loads (or creates) a .csv for similarities to all known labels as a [10] element array per row
 # e.g [0] : [sim to 0s, sim to 1s,.... sim to 9s]
 def load_seed_similarity(fname='Seed_Similarity'):
-    preload = None#load_csv(fname+'.csv')
+    preload = load_csv(fname+'.csv')
     if preload is not None:
         return preload
     else:
@@ -137,5 +163,7 @@ if __name__ == '__main__':
     print("                               Doesn't need to include .csv in fname")
     print("                               Will be saved into Labels/fname")
     print("Running Unit Tests (This will take a while): ...")
-    load_extracted_features_PCA(k=999)
+    # load_extracted_features_PCA(k=999)
+    load_seed_matrix()
+    load_extracted_features_PCA(k=32, onlyseeds=True)
     # unittests()
