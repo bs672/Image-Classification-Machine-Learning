@@ -2,6 +2,7 @@ Explained variance percentage graph shows that about top 20 eigenvectors account
 2 kids of preliminary labelings - 1) distance from mean of cluster to each of the seed groups. 
     2) distance from mean of cluster to each of the seed similarity groups
 Accuracy went up from 4% to 26% after using 30 components instead of 5. down to 9% at 100 components. Shoulder probably around 15
+When using seeds to generate initial centroids for kmeans, find that seeds themselves move out of the clusters they were initially in
 
 TODO:
     Basic supervised model
