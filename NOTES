@@ -4,6 +4,25 @@ Explained variance percentage graph shows that about top 20 eigenvectors account
 Accuracy went up from 4% to 26% after using 30 components instead of 5. down to 9% at 100 components. Shoulder probably around 15
 When using seeds to generate initial centroids for kmeans, find that seeds themselves move out of the clusters they were initially in
 
+similarity graph is not based on feature vectors, based on cleaner version. so different type of information. 
+features extracted from noisy version of image, similarity extracted from cleaner version.
+
+plot similarity graph with images for known digits
+
+if in similarity and within a certain euclidean distance then label
+
+get projection matrix from first CCA on first 6000 and then use it on all
+
+try view 1 as kernel pca
+
+use metrics
+
+view 1 - extracted_features, view 2 - spectral embedding
+Idea 1 - extend similarity graph and then do CCA on full data set
+Idea 2 - do CCA first and then k-nearest neighbors -- overfitting on first 6000
+
+only 60 points, noise in them
+
 TODO:
     Basic supervised model
     Seed_sets extended using similarity graph (if improvement then that means seeds are outliers in their digit class)
