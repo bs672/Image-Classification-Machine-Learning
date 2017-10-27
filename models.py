@@ -15,7 +15,8 @@ from keras.regularizers import l2
 from keras import backend as K
 from keras.optimizers import SGD,Adam
 from keras.losses import binary_crossentropy
-from data_gen import seed_generator, seed_validation, siamese_sanity_check
+from data_gen import seed_generator, seed_validation, siamese_sanity_check, seed_similarity_generator
+from csv_read import load_seed
 
 # x_train, y_train = generate_training_data(nums=880)
 # x_test, y_test = generate_validation_data()
@@ -70,9 +71,38 @@ else:
 
 x_test, y_test = siamese_sanity_check(input_shape=input_shape)
 sanity_check = siamese_net.evaluate(x_test, y_test, batch_size=10)
-print('Final Score : {}'.format(sanity_check))
+print('\nSanity Check : {}'.format(sanity_check))
 
 if sanity_check[1] < 1.0:
     print('Siamese Net isn\'t working')
 elif not os.path.isfile('test.hdf5') or override:
     siamese_net.save_weights('test.hdf5')
+
+seeds = load_seed()
+s = seeds.shape[0]
+print('Running predictions')
+similarity_predictions = siamese_net.predict_generator(seed_similarity_generator(input_shape=input_shape), 10000)
+print('Reformating predictions')
+output = np.zeros((10000, s, 1))
+for batch in range(10000):
+    a, b = s*batch, s*(batch+1)
+    output[batch] = similarity_predictions[a:b]
+print('Prediction shape {}'.format(output.shape))
+
+# for i in range(10): print('Seed index {}, Seed label {}, Output Similarity {}, Output index {}'.format(seeds[i][0], seeds[i][1], output[i], i+1))
+# print('Clustering via summed similarity')
+# labels = np.zeros(10000, dtype='int')
+# for i, predictions in enumerate(output):
+#     assert predictions.shape == (s,1)
+#     similarity_sum = np.zeros(10)
+#     for index in range(s):
+#         similarity_sum[seeds[index][1]] += predictions[index]
+#     labels[i] = np.argmax(similarity_sum)
+#
+# print('Clustering via summed similarity sanity check')
+# correctness = 0.0
+# for index, label in seeds:
+#     correctness += int(labels[index-1] == label)
+#
+# correctness /= s
+# print('Percentage of correctly clustered seeds : {}'.format(correctness))

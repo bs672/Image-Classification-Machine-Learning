@@ -151,4 +151,22 @@ def siamese_sanity_check(input_shape=(1,1084)):
     for i in range(nums):
         input1[i], input2[i] = f[i] , f[i]
         outputs[i] = 1
-    return [input1, input2] ,outputs
+    return [input1, input2], outputs
+
+# creates batchs of all features compared to all sees
+def seed_similarity_generator(input_shape=(1,1084)):
+    s = load_CCA_features(k = input_shape[0]*input_shape[1], onlyseeds=True)
+    f = load_CCA_features(k = input_shape[0]*input_shape[1])
+    nums = f.shape[0]
+    batch_size = s.shape[0]
+    input1 = np.empty(
+        (batch_size, ) + input_shape)
+    input2 = np.empty(
+        (batch_size, ) + input_shape)
+    # initialize input_1
+    for batch_index in range(batch_size):
+        input1[batch_index] = s[batch_index]
+    while True:
+        for i in range(nums):
+            input2[:] = f[i]
+            yield [input1, input2]
