@@ -18,8 +18,7 @@ from sklearn.manifold import SpectralEmbedding
 
 def unittests():
     fnames = ['Seed_Similarity.csv', 'Seed.csv', 'Seed_Matrix.csv', 'Graph.csv', 'Graph_Matrix.csv',
-                'Extracted_features.csv', 'Extracted_features_PCA.csv',
-                'Extracted_features_PCA_Seeds.csv', 'SpectralEmbedding.csv']
+                'Extracted_features.csv', 'SpectralEmbedding.csv']
     g = load_graph()
     g_s = load_graph(shape_match = True)
     e = load_extracted_features()
@@ -30,6 +29,8 @@ def unittests():
     e_pca = load_extracted_features_PCA()
     e_seeds_pca = load_extracted_features_PCA(onlyseeds=True)
     spec = load_spectral_embedding()
+    cca_f = load_CCA_features(k = 8)
+    cca_f_seed = load_CCA_features(k = 8, onlyseeds=True)
     for f in fnames:
         assert os.path.isfile(f), "{} should be a file".format(f)
     assert g.shape == (7064950, 2), 'Graph has wrong size: {} should be (7064950, 2)'.format(g.shape)
@@ -41,7 +42,15 @@ def unittests():
     assert s.shape == (60,2), 'Seed has wrong size: {} should be (60,2)'.format(s.shape)
     assert ss.shape == (6000,10), 'Seed Similarity has wrong size: {} should be (6000,10)'.format(ss.shape)
     assert e_seeds.shape == (60,1084), 'Extracted_features of seeds has wrong size: {} should be (60,1084)'.format(e_seeds.shape)
-    assert e_pca.shape == e.shape, 'Extracted_featuresPCA should match Extracted_features'
+    assert e_pca.shape == e.shape, 'Extracted_features_PCA1084 should match Extracted_features'
+    assert e_seeds_pca.shape == e_seeds.shape, '{} should be {}'.format(e_seeds_pca.shape, e_seeds.shape)
+    assert cca_f.shape == (10000,8)
+    assert cca_f_seed.shape == (60,8)
+    for i in range(1,101):
+        temp = load_extracted_features_PCA(k=i)
+        temp_seeds = load_extracted_features_PCA(k=i, onlyseeds=True)
+        for s_i in range(s.shape[0]):
+            assert np.allclose(temp_seeds[s_i], temp[s[s_i][0]-1], atol=0.0001), '{} vs {}'.format(temp_seeds[s_i], temp[s[s_i][0]-1])
     # assert spec.shape == g_s.shape, 'SpectralEmbedding should match Graph Matrix'
 
     print('Passed')
@@ -85,6 +94,7 @@ def load_graph(fname='Graph', shape_match=False):
             print("Saving new similarity values as a matrix: {}_Matrix.csv".format(fname))
             # print("Average Similarity is : {}".format(output.sum()/(6000.0**2)))
             np.savetxt(fname+'_Matrix.csv',  np.asarray(output), delimiter=",", fmt='%d')
+            print('Saved ' + fname+'_Matrix.csv')
             return output
     else:
         return np.array(load_csv(fname+'.csv'), dtype='int')
@@ -103,23 +113,25 @@ def load_extracted_features(onlyseeds=False):
 
 # Loads extracted features with PCA selected k features
 # Uses a preloaded .csv of PCA run for all components
-# Only seeds is a little funky right now, don't use
+# You want to run PCA separately of each amount of components because
+# Accuracy tends to differ in lower dimensions
 def load_extracted_features_PCA(k=1084, onlyseeds=False):
-    fname = "Extracted_features_PCA{}.csv".format(('_Seeds' if onlyseeds else ''))
+    fname = "Extracted_features_PCA{}.csv".format(k)
     preload = load_csv(fname)
     if preload is None:
-        print('Running PCA on extracted_features{}'.format('_Seeds' if onlyseeds else ''))
+        print('Running PCA on extracted_features{}'.format(k))
         X = load_extracted_features()
         preload = PCA(n_components=k).fit_transform(X)
-        if onlyseeds:
-            s = load_seed()
-            preload_seeds = np.zeros((s.shape[0],k))
-            for i in range(s.shape[0]):
-                # print(s[i][0])
-                preload_seeds[i,:] = preload[s[i][0]]
-            preload = preload_seeds
         np.savetxt(fname, np.asarray(preload), delimiter=",", fmt='%.5f')
-        print('Saved')
+        print('Saved ' + fname)
+
+    if onlyseeds:
+        s = load_seed()
+        preload_seeds = np.zeros((s.shape[0],k))
+        for i in range(s.shape[0]):
+            # print(s[i][0])
+            preload_seeds[i] = preload[s[i][0]-1]
+        preload = preload_seeds
 
     true_k = min(k, preload.shape[1])
     output = preload[:, :true_k] # Get the k first eigens of PCA output
@@ -145,14 +157,14 @@ def load_seed_matrix(fname='Seed_Matrix'):
                 output[i,j] = int(s[i,1]==s[j,1])
         assert check_symmetric(output), 'Seed Matrix should be symmetric'
         np.savetxt(fname+'.csv',  np.asarray(output), delimiter=",", fmt='%d')
-        print('Done')
+        print('Saved ' + fname+'.csv')
         return output
 
 def load_spectral_embedding(k=5990):
     fname = 'SpectralEmbedding.csv'
     preload = load_csv(fname)
     if preload is None:
-        print('Run spectralembedding on seed_matrix')
+        print('Run spectralembedding on Graph_Matrix.csv')
         matrix = load_graph(shape_match=True)
         features = 5990
         # I reduced the number of feature to 5990 to handle an issue with
@@ -160,7 +172,7 @@ def load_spectral_embedding(k=5990):
         # Issue is with eigsh
         preload = SpectralEmbedding(n_components=features).fit_transform(matrix)
         np.savetxt(fname, np.asarray(preload), delimiter=",", fmt='%.4f')
-        print('Saved')
+        print('Saved ' + fname)
 
     true_k = min(k, preload.shape[1])
     output = preload[:, :true_k] # Get the k first eigens of PCA output
@@ -195,9 +207,25 @@ def load_seed_similarity(fname='Seed_Similarity'):
                 print("More Similar to a different value")
         print("A seed is more similar to other value seeds {} of them time".format(issues/60.))
         np.savetxt(fname+'.csv',  np.asarray(output), delimiter=",", fmt='%d')
+        print('Saved ' + fname)
         return output
 
-#TODO implement save labels
+def load_CCA_features(k=8, onlyseeds=False):
+    fname = "CCAPred{}.csv".format(k)
+    preload = load_csv(fname)
+    if preload is None:
+        print(fname + 'not in DataSets')
+        return None
+
+    if onlyseeds:
+        s = load_seed()
+        output = np.zeros((s.shape[0],preload.shape[1]))
+        for i in range(s.shape[0]):
+            output[i] = preload[s[i][0]-1]
+        return output
+    else:
+        return preload
+
 
 if __name__ == '__main__':
     print("Visible functions")
