@@ -103,15 +103,22 @@ def load_extracted_features(onlyseeds=False):
 
 # Loads extracted features with PCA selected k features
 # Uses a preloaded .csv of PCA run for all components
+# Only seeds is a little funky right now, don't use
 def load_extracted_features_PCA(k=1084, onlyseeds=False):
     fname = "Extracted_features_PCA{}.csv".format(('_Seeds' if onlyseeds else ''))
     preload = load_csv(fname)
     if preload is None:
         print('Running PCA on extracted_features{}'.format('_Seeds' if onlyseeds else ''))
-        X = load_extracted_features(onlyseeds=onlyseeds)
-        features = min(X.shape[0], X.shape[1])
-        preload = PCA(n_components=features).fit_transform(X)
-        np.savetxt(fname, np.asarray(preload), delimiter=",", fmt='%.4f')
+        X = load_extracted_features()
+        preload = PCA(n_components=k).fit_transform(X)
+        if onlyseeds:
+            s = load_seed()
+            preload_seeds = np.zeros((s.shape[0],k))
+            for i in range(s.shape[0]):
+                # print(s[i][0])
+                preload_seeds[i,:] = preload[s[i][0]]
+            preload = preload_seeds
+        np.savetxt(fname, np.asarray(preload), delimiter=",", fmt='%.5f')
         print('Saved')
 
     true_k = min(k, preload.shape[1])

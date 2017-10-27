@@ -64,9 +64,9 @@ for n_comp in range(2,10):
     for i, label in seeds:
         count += int(label == kmeans.labels_[i])
         correctness[n_comp-2] += int(label == kmeans.labels_[i])
-        # if not(label == kmeans.labels_[i]):
-        #     print('Seed {} is mislabeled'.format(i))
-        #     print('{} should be {}'.format(kmeans.labels_[i], label))
+        if not(label == kmeans.labels_[i]):
+            print('Seed {} is mislabeled'.format(i))
+            print('{} should be {}'.format(kmeans.labels_[i], label))
     print('Correctness : {} '.format( count/60. ))
 
     # scores = np.zeros(10)
