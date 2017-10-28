@@ -76,8 +76,10 @@ def load_csv(fname):
 def check_symmetric(a, tol=1e-8):
     return np.allclose(a, a.T, atol=tol)
 
-def load_graph(fname='Graph', shape_match=False):
+def load_graph(fname='Graph', shape_match=False,type='adj'):
     if shape_match:
+        if type == 'dist':
+            fname = fname + '_Dist'
         preload = load_csv(fname+'_Matrix.csv')
         if preload is not None:
             # print("Average Similarity : {}".format((preload.sum())/(6000.0**2)))
@@ -95,6 +97,8 @@ def load_graph(fname='Graph', shape_match=False):
             # Identity used because we should consider a point to be similar to itself
             for edge in g:
                 output[edge[0]-lower, edge[1]-lower] = 1
+            if type == 'dist':
+                #TODO: put changes here
             print("Saving new similarity values as a matrix: {}_Matrix.csv".format(fname))
             # print("Average Similarity is : {}".format(output.sum()/(6000.0**2)))
             np.savetxt(fname+'_Matrix.csv',  np.asarray(output), delimiter=",", fmt='%d')
@@ -164,12 +168,14 @@ def load_seed_matrix(fname='Seed_Matrix'):
         print('Saved ' + fname+'.csv')
         return output
 
-def load_spectral_embedding(k=5990):
+def load_spectral_embedding(k=5990,type='adj'):
     fname = 'SpectralEmbedding.csv'
+    if type == 'dist':
+        fname = 'SpectralEmbeddingDist.csv'
     preload = load_csv(fname)
     if preload is None:
         print('Run spectralembedding on Graph_Matrix.csv')
-        matrix = load_graph(shape_match=True)
+        matrix = load_graph(shape_match=True,type=type)
         features = 5990
         # I reduced the number of feature to 5990 to handle an issue with
         # using Sklearn Spectral embedding with n_components = matrix size
