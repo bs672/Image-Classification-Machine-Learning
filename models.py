@@ -15,8 +15,8 @@ from keras.regularizers import l2
 from keras import backend as K
 from keras.optimizers import SGD,Adam
 from keras.losses import binary_crossentropy
-from data_gen import seed_generator, seed_validation, siamese_sanity_check, seed_similarity_generator
-from csv_read import load_seed
+from data_gen import seed_generator, seed_validation, siamese_sanity_check, seed_similarity_generator, siamese_sanity_check_symmetry
+from csv_read import load_seed, load_CCA_features
 
 # x_train, y_train = generate_training_data(nums=880)
 # x_test, y_test = generate_validation_data()
@@ -70,39 +70,47 @@ else:
                             validation_data=seed_validation(input_shape=input_shape))
 
 x_test, y_test = siamese_sanity_check(input_shape=input_shape)
+print('Performing sanity check: ([x,x]) => 1')
 sanity_check = siamese_net.evaluate(x_test, y_test, batch_size=10)
 print('\nSanity Check : {}'.format(sanity_check))
 
-if sanity_check[1] < 1.0:
-    print('Siamese Net isn\'t working')
-elif not os.path.isfile('test.hdf5') or override:
+x_test, y_test = siamese_sanity_check_symmetry(input_shape=input_shape)
+print('Performing sanity check: ([y,x]) => ([x,y])')
+sanity_check = siamese_net.evaluate(x_test, y_test, batch_size=10)
+print('\nSanity Check : {}'.format(sanity_check))
+
+if not os.path.isfile('test.hdf5') or override:
     siamese_net.save_weights('test.hdf5')
 
 seeds = load_seed()
-s = seeds.shape[0]
-print('Running predictions')
-similarity_predictions = siamese_net.predict_generator(seed_similarity_generator(input_shape=input_shape), 10000)
-print('Reformating predictions')
-output = np.zeros((10000, s, 1))
-for batch in range(10000):
-    a, b = s*batch, s*(batch+1)
-    output[batch] = similarity_predictions[a:b]
-print('Prediction shape {}'.format(output.shape))
+seed_features = load_CCA_features(k = 8, onlyseeds=True)
+features = load_CCA_features(k = 8)
+nums = features.shape[0]
+s = seed_features.shape[0]
+input1 = np.empty(
+    (s, ) + input_shape)
+input2 = np.empty(
+    (s, ) + input_shape)
+labels = np.zeros(nums, dtype = 'int')
+for batch in range(nums):
+    # initialize input_1
+    for i in range(s):
+        input1[i], input2[i] = seed_features[i], features[batch]
+    pred = siamese_net.predict([input1, input2], batch_size=60)
+    # print('Predictions for data point {}: {}'.format(batch+1, pred))
+    similarity_sums = np.zeros(10)
+    for j in range(s):
+        similarity_sums[seeds[j][1]] = pred[j][0]
+    # if index == (batch + 1):
+    #     print("Seed {} with label {} prediction values".format(index, label))
+    #     print('')
+    labels[batch] = np.argmax(similarity_sums)
 
-# for i in range(10): print('Seed index {}, Seed label {}, Output Similarity {}, Output index {}'.format(seeds[i][0], seeds[i][1], output[i], i+1))
-# print('Clustering via summed similarity')
-# labels = np.zeros(10000, dtype='int')
-# for i, predictions in enumerate(output):
-#     assert predictions.shape == (s,1)
-#     similarity_sum = np.zeros(10)
-#     for index in range(s):
-#         similarity_sum[seeds[index][1]] += predictions[index]
-#     labels[i] = np.argmax(similarity_sum)
-#
-# print('Clustering via summed similarity sanity check')
-# correctness = 0.0
-# for index, label in seeds:
-#     correctness += int(labels[index-1] == label)
-#
-# correctness /= s
-# print('Percentage of correctly clustered seeds : {}'.format(correctness))
+print('Clustering via summed similarity sanity check')
+correctness = 0.0
+for index, label in seeds:
+    print('{} should be {}'.format(labels[index-1],label))
+    correctness += int(labels[index-1] == label)
+
+correctness /= s
+print('Percentage of correctly clustered seeds : {}'.format(correctness))

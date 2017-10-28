@@ -51,6 +51,10 @@ def unittests():
         temp_seeds = load_extracted_features_PCA(k=i, onlyseeds=True)
         for s_i in range(s.shape[0]):
             assert np.allclose(temp_seeds[s_i], temp[s[s_i][0]-1], atol=0.0001), '{} vs {}'.format(temp_seeds[s_i], temp[s[s_i][0]-1])
+
+    for i in range(60):
+        for j in range(60):
+            if s_m[i,j]: assert s[i][1] == s[j][1]
     # assert spec.shape == g_s.shape, 'SpectralEmbedding should match Graph Matrix'
 
     print('Passed')
@@ -106,7 +110,7 @@ def load_extracted_features(onlyseeds=False):
         output = np.zeros((60,1084))
         i = 0;
         for index, label in S:
-            output[i] = X[index]
+            output[i] = X[index-1]
             i += 1
         return output
     return load_csv('Extracted_features.csv')

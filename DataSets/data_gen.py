@@ -153,7 +153,28 @@ def siamese_sanity_check(input_shape=(1,1084)):
         outputs[i] = 1
     return [input1, input2], outputs
 
-# creates batchs of all features compared to all sees
+def siamese_sanity_check_symmetry(input_shape=(1,1084)):
+    f = load_CCA_features(k = input_shape[0]*input_shape[1], onlyseeds=True)
+    g = load_seed_matrix()
+    nums = f.shape[0]
+    sets = 5000
+    input1 = np.empty(
+        (sets*2,  ) + input_shape )
+    input2 = np.empty(
+        (sets*2,  ) + input_shape )
+    outputs = np.empty(
+        (sets*2, ) )
+    i_array = np.random.choice(nums, sets)
+    j_array = np.random.choice(nums, sets)
+    for k in range(sets):
+        i, j = i_array[k], j_array[k]
+        input1[2*k], input2[2*k] = f[i] , f[j]
+        input1[2*k + 1], input2[2*k + 1] = f[j] , f[i]
+        outputs[2*k] = g[i, j]
+        outputs[2*k + 1] = g[i, j]
+    return [input1, input2], outputs
+
+# creates batchs of all features compared to all seeds
 def seed_similarity_generator(input_shape=(1,1084)):
     s = load_CCA_features(k = input_shape[0]*input_shape[1], onlyseeds=True)
     f = load_CCA_features(k = input_shape[0]*input_shape[1])
@@ -164,8 +185,9 @@ def seed_similarity_generator(input_shape=(1,1084)):
     input2 = np.empty(
         (batch_size, ) + input_shape)
     # initialize input_1
-    for batch_index in range(batch_size):
-        input1[batch_index] = s[batch_index]
+    for i in range(batch_size):
+        input1[i] = s[i]
+    # print('Input 1 shape {}'.format(input1.shape))
     while True:
         for i in range(nums):
             input2[:] = f[i]
