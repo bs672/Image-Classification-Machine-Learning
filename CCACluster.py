@@ -32,7 +32,7 @@ from csv_read import load_extracted_features_PCA, load_spectral_embedding, load_
 class CCACluster():
 
     # Only define k_CCA if you don't want to automatically determine the best value
-    def __init__(self, k_PCA, k_SE, k_CCA=None, best_reg=None, verbose=True, type=type):
+    def __init__(self, k_PCA, k_SE, k_CCA=None, best_reg=None, verbose=True, type='adj'):
         self.features = load_extracted_features_PCA(k=k_PCA)
         self.graph = load_spectral_embedding(k=k_SE,type=type)
         self.seeds = load_seed()
@@ -109,7 +109,7 @@ class CCACluster():
         if self.verbose:
             print('Produced predictions')
 
-    def cluster(self, from_save=None):
+    def cluster(self, from_save=None, type='kmeans'):
         if self.cca_predictions is None:
             if from_save:
                 self.cca_predictions = load_csv(from_save)
