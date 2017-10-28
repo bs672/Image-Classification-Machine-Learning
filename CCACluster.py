@@ -75,9 +75,11 @@ class CCACluster():
         else:
             ccaCV = rcca.CCACrossValidate(kernelcca = False,
                                 numCCs = np.arange(1, min(self.k_PCA, self.k_SE)),
-                                regs = [0],
+                                regs = [0, 1e2, 1e4, 1e6],
                                 verbose=self.verbose)
 
+        if self.features is None or self.graph is None:
+            print('What the fuck is this?')
         ccaCV.train([self.features[:6000], self.graph[:6000]])
         self.k_CCA, self.best_reg = ccaCV.best_numCC, ccaCV.best_reg
         if self.verbose:
@@ -130,16 +132,14 @@ class CCACluster():
         if self.cca_predictions is None:
             self.predict()
 
-        np.savetxt('CCAPred{}.csv'.format(self.k_CCA), np.asarray(self.cca_predictions), delimiter=",", fmt='%.5f')
+        np.savetxt('CCAPred-{}-{}-{}.csv'.format(self.k_CCA, self.k_PCA, self.k_SE), np.asarray(self.cca_predictions), delimiter=",", fmt='%.5f')
         if self.verbose:
             print('Saved predictions')
 
-
-
 if __name__ == '__main__':
     test = CCACluster(k_PCA = 100, k_SE = 100)
-    # test.determine_CCA_components()
-    # test.k_CCA
-    # test.predict()
-    # test.save_predictions()
-    test.cluster(from_save='CCAPred8.csv')
+    test.determine_CCA_components()
+    print('How many recommended components : {}'.format(test.k_CCA))
+    test.predict()
+    test.save_predictions()
+    # test.cluster(from_save='CCAPred8.csv')

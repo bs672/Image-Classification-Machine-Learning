@@ -127,10 +127,35 @@ print('Percentage of correctly clustered seeds via Max Arg: {}'.format(correctne
 correctness_sum /= s
 print('Percentage of correctly clustered seeds via Sum: {}'.format(correctness_sum))
 
-print('Confidence in each prediction via max similarity')
-for index, c in confidence:
-    print('Element {} has confidence {:1.3f}'.format(int(index),c))
-np.savetxt('AllLabels{}viaSum.csv'.format(FNAME), np.asarray(labels_sum), delimiter=',', fmt='%d')
-np.savetxt('results{}viaSum.csv'.format(FNAME), np.asarray(labels_sum[6000:]), delimiter=',', fmt='%d', header='Id,Label')
-np.savetxt('AllLabels{}viaMax.csv'.format(FNAME), np.asarray(labels_max), delimiter=',', fmt='%d')
-np.savetxt('results{}viaMax.csv'.format(FNAME), np.asarray(labels_max[6000:]), delimiter=',', fmt='%d', header='Id,Label')
+def purity_score(clusters, classes):
+    """
+    Calculate the purity score for the given cluster assignments and ground truth classes
+
+    :param clusters: the cluster assignments array
+    :type clusters: numpy.array
+
+    :param classes: the ground truth classes
+    :type classes: numpy.array
+
+    :returns: the purity score
+    :rtype: float
+    """
+    A = np.c_[(np.array([clusters[index-1] for index, label in classes]), classes)]
+
+    n_accurate = 0.
+
+    for j in np.unique(A[:,0]):
+        z = A[A[:,0] == j, 1]
+        x = np.argmax(np.bincount(z))
+        n_accurate += len(z[z == x])
+
+    return n_accurate / A.shape[0]
+
+print(purity_score(labels_max, seeds))
+# print('Confidence in each prediction via max similarity')
+# for index, c in confidence:
+#     print('Element {} has confidence {:1.3f}'.format(int(index),c))
+# np.savetxt('AllLabels{}viaSum.csv'.format(FNAME), np.asarray(labels_sum), delimiter=',', fmt='%d')
+# np.savetxt('results{}viaSum.csv'.format(FNAME), np.asarray(labels_sum[6000:]), delimiter=',', fmt='%d', header='Id,Label')
+# np.savetxt('AllLabels{}viaMax.csv'.format(FNAME), np.asarray(labels_max), delimiter=',', fmt='%d')
+# np.savetxt('results{}viaMax.csv'.format(FNAME), np.asarray(labels_max[6000:]), delimiter=',', fmt='%d', header='Id,Label')
