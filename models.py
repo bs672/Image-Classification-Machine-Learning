@@ -16,13 +16,15 @@ from keras import backend as K
 from keras.optimizers import SGD,Adam
 from keras.losses import binary_crossentropy
 from data_gen import seed_generator, seed_validation, siamese_sanity_check, seed_similarity_generator, siamese_sanity_check_symmetry
-from csv_read import load_seed, load_CCA_features
+from csv_read import load_seed, load_data_features
 
-FNAME = 'test'
+k = 8
+FNAME = 'CCAGraphPred-{}-500-500'.format(k)
+print('Reading from {}.csv'.format(FNAME))
+print('Saving to {}.hdf5'.format(FNAME))
 # Test2 has greater gaussian noise and more dropout
 # x_train, y_train = generate_training_data(nums=880)
 # x_test, y_test = generate_validation_data()
-k = 8
 input_shape = (1, k)
 left_input = Input(input_shape)
 right_input = Input(input_shape)
@@ -30,7 +32,7 @@ right_input = Input(input_shape)
 # Internal model is a softmax 10-class classifier
 #TEST
 model = Sequential()
-model.add(GaussianNoise(0.001, input_shape=input_shape))
+model.add(GaussianNoise(0.01, input_shape=input_shape))
 model.add(Flatten())
 model.add(Dense(64, activation='relu'))
 model.add(Dropout(0.5))
@@ -66,16 +68,16 @@ if os.path.isfile(FNAME+'.hdf5') and not override:
     siamese_net.load_weights(FNAME+'.hdf5')
 else:
     steps = 10000
-    siamese_net.fit_generator(seed_generator(batch_size=batch_size, input_shape=input_shape),
+    siamese_net.fit_generator(seed_generator(fname=FNAME, batch_size=batch_size, input_shape=input_shape),
                             steps, epochs=10,
-                            validation_data=seed_validation(input_shape=input_shape))
+                            validation_data=seed_validation(fname=FNAME, input_shape=input_shape))
 
-x_test, y_test = siamese_sanity_check(input_shape=input_shape)
+x_test, y_test = siamese_sanity_check(fname=FNAME, input_shape=input_shape)
 print('Performing sanity check: ([x,x]) => 1')
 sanity_check = siamese_net.evaluate(x_test, y_test, batch_size=10)
 print('\nSanity Check : {}'.format('Passed' if sanity_check[1] == 1.0 else 'Failed'))
 
-x_test, y_test = siamese_sanity_check_symmetry(input_shape=input_shape)
+x_test, y_test = siamese_sanity_check_symmetry(fname=FNAME, input_shape=input_shape)
 print('Performing sanity check: ([y,x]) => ([x,y])')
 sanity_check = siamese_net.evaluate(x_test, y_test, batch_size=10)
 print('\nSanity Check : {}'.format('Passed' if sanity_check[1] == 1.0 else 'Failed'))
@@ -84,8 +86,8 @@ if not os.path.isfile(FNAME+'.hdf5') or override:
     siamese_net.save_weights(FNAME+'.hdf5')
 
 seeds = load_seed()
-seed_features = load_CCA_features(k = 8, onlyseeds=True)
-features = load_CCA_features(k = 8)
+seed_features = load_data_features(fname=FNAME, onlyseeds=True)
+features = load_data_features(fname=FNAME)
 nums = features.shape[0]
 s = seed_features.shape[0]
 input1 = np.empty(
@@ -126,37 +128,37 @@ correctness_max /= s
 print('Percentage of correctly clustered seeds via Max Arg: {}'.format(correctness_max))
 correctness_sum /= s
 print('Percentage of correctly clustered seeds via Sum: {}'.format(correctness_sum))
-
-def purity_score(clusters, classes):
-    """
-    Calculate the purity score for the given cluster assignments and ground truth classes
-
-    :param clusters: the cluster assignments array
-    :type clusters: numpy.array
-
-    :param classes: the ground truth classes
-    :type classes: numpy.array
-
-    :returns: the purity score
-    :rtype: float
-    """
-
-    A = np.c_[(np.array([clusters[index-1] for index, label in classes]), classes)]
-
-    n_accurate = 0.
-
-    for j in np.unique(A[:,0]):
-        z = A[A[:,0] == j, 1]
-        x = np.argmax(np.bincount(z))
-        n_accurate += len(z[z == x])
-
-    return n_accurate / A.shape[0]
-
-print(purity_score(labels_max, seeds))
+#
+# def purity_score(clusters, classes):
+#     """
+#     Calculate the purity score for the given cluster assignments and ground truth classes
+#
+#     :param clusters: the cluster assignments array
+#     :type clusters: numpy.array
+#
+#     :param classes: the ground truth classes
+#     :type classes: numpy.array
+#
+#     :returns: the purity score
+#     :rtype: float
+#     """
+#
+#     A = np.c_[(np.array([clusters[index-1] for index, label in classes]), classes)]
+#
+#     n_accurate = 0.
+#
+#     for j in np.unique(A[:,0]):
+#         z = A[A[:,0] == j, 1]
+#         x = np.argmax(np.bincount(z))
+#         n_accurate += len(z[z == x])
+#
+#     return n_accurate / A.shape[0]
+#
+# print(purity_score(labels_max, seeds))
 # print('Confidence in each prediction via max similarity')
 # for index, c in confidence:
 #     print('Element {} has confidence {:1.3f}'.format(int(index),c))
 # np.savetxt('AllLabels{}viaSum.csv'.format(FNAME), np.asarray(labels_sum), delimiter=',', fmt='%d')
-# np.savetxt('results{}viaSum.csv'.format(FNAME), np.asarray(labels_sum[6000:]), delimiter=',', fmt='%d', header='Id,Label')
+np.savetxt('results{}viaSum.csv'.format(FNAME), np.asarray(labels_sum[6000:]), delimiter=',', fmt='%d', header='Id,Label')
 # np.savetxt('AllLabels{}viaMax.csv'.format(FNAME), np.asarray(labels_max), delimiter=',', fmt='%d')
-# np.savetxt('results{}viaMax.csv'.format(FNAME), np.asarray(labels_max[6000:]), delimiter=',', fmt='%d', header='Id,Label')
+np.savetxt('results{}viaMax.csv'.format(FNAME), np.asarray(labels_max[6000:]), delimiter=',', fmt='%d', header='Id,Label')

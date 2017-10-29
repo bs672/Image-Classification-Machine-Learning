@@ -2,7 +2,7 @@ import numpy as np
 import os
 import pandas as pd
 from sklearn.preprocessing import StandardScaler
-from sklearn.decomposition import PCA
+from sklearn.decomposition import PCA, KernelPCA
 from sklearn.manifold import SpectralEmbedding
 
 """
@@ -30,8 +30,8 @@ def unittests():
     e_pca = load_extracted_features_PCA()
     e_seeds_pca = load_extracted_features_PCA(onlyseeds=True)
     spec = load_spectral_embedding()
-    cca_f = load_CCA_features(k = 8)
-    cca_f_seed = load_CCA_features(k = 8, onlyseeds=True)
+    # cca_f = load_CCA_features(k = 8)
+    # cca_f_seed = load_CCA_features(k = 8, onlyseeds=True)
     g_dist = load_graph(shape_match=True, g_type='dist')
     s_dist = load_spectral_embedding(k=10, g_type='dist')
     g_merged = load_merged_graph_matrix()
@@ -49,8 +49,8 @@ def unittests():
     assert e_seeds.shape == (60,1084), 'Extracted_features of seeds has wrong size: {} should be (60,1084)'.format(e_seeds.shape)
     assert e_pca.shape == e.shape, 'Extracted_features_PCA1084 should match Extracted_features'
     assert e_seeds_pca.shape == e_seeds.shape, '{} should be {}'.format(e_seeds_pca.shape, e_seeds.shape)
-    assert cca_f.shape == (10000,8)
-    assert cca_f_seed.shape == (60,8)
+    # assert cca_f.shape == (10000,8)
+    # assert cca_f_seed.shape == (60,8)
     assert g_dist.shape == (10000,10000)
     assert s_dist.shape == (10000,10)
     assert g_merged.shape == (6000,6000)
@@ -144,7 +144,7 @@ def load_extracted_features_PCA(k=1084, onlyseeds=False):
     if preload is None:
         print('Running PCA on extracted_features{}'.format(k))
         X = StandardScaler(with_std=False).fit_transform(load_extracted_features())
-        preload = PCA(n_components=k).fit_transform(X)
+        preload = KernelPCA(n_components=k, kernel='rbf').fit_transform(X)
         np.savetxt(fname, np.asarray(preload), delimiter=",", fmt='%.5f')
         print('Saved ' + fname)
 
@@ -263,8 +263,23 @@ def load_seed_similarity(fname='Seed_Similarity'):
         return output
 
 def load_CCA_features(k=8, onlyseeds=False):
-    fname = "CCAPred{}.csv".format(k)
+    fname = "CCAGraphPred-{}-100-100.csv".format(k)
     preload = load_csv(fname)
+    if preload is None:
+        print(fname + 'not in DataSets')
+        return None
+
+    if onlyseeds:
+        s = load_seed()
+        output = np.zeros((s.shape[0],preload.shape[1]))
+        for i in range(s.shape[0]):
+            output[i] = preload[s[i][0]-1]
+        return output
+    else:
+        return preload
+
+def load_data_features(fname, onlyseeds=False):
+    preload = load_csv(fname + '.csv')
     if preload is None:
         print(fname + 'not in DataSets')
         return None
@@ -289,6 +304,7 @@ def load_merged_graph_matrix():
             for j in range(G.shape[1]):
                 D[i,j] *= G[i,j]
         np.savetxt('Graph_Matrix_Merged.csv',  np.asarray(D), delimiter=",")
+        print('New Graph is symmetric: {}'.format(check_symmetric(D)))
         return D
     else:
         return preload
