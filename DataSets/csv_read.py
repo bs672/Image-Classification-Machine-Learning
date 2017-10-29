@@ -34,6 +34,8 @@ def unittests():
     cca_f_seed = load_CCA_features(k = 8, onlyseeds=True)
     g_dist = load_graph(shape_match=True, g_type='dist')
     s_dist = load_spectral_embedding(k=10, g_type='dist')
+    g_merged = load_merged_graph_matrix()
+    s_merged = load_spectral_embedding(k=10, g_type='merged')
     for f in fnames:
         assert os.path.isfile(f), "{} should be a file".format(f)
     assert g.shape == (7064950, 2), 'Graph has wrong size: {} should be (7064950, 2)'.format(g.shape)
@@ -51,6 +53,8 @@ def unittests():
     assert cca_f_seed.shape == (60,8)
     assert g_dist.shape == (10000,10000)
     assert s_dist.shape == (10000,10)
+    assert g_merged.shape == (6000,6000)
+    assert s_merged.shape == (6000, 10)
     # for i in range(1,101):
     #     temp = load_extracted_features_PCA(k=i)
     #     temp_seeds = load_extracted_features_PCA(k=i, onlyseeds=True)
@@ -100,7 +104,7 @@ def load_graph(fname='Graph', shape_match=False, g_type='adj'):
                     for j in range(size):
                         output[i,j] = A(X[i],X[j])
                 print("Saving new distance values as a matrix: {}_Matrix.csv".format(fname))
-                np.savetxt(fname+'_Matrix.csv',  np.asarray(output), delimiter=",", fmt='%.4f')
+                np.savetxt(fname+'_Matrix.csv',  np.asarray(output), delimiter=",")
             else:
                 g = np.array(load_csv(fname+'.csv'), dtype='int')
                 lower, upper = min(min(i, j) for i, j in g), max(max(i, j) for i, j in g)
@@ -180,32 +184,45 @@ def load_seed_matrix(fname='Seed_Matrix'):
         return output
 
 def load_spectral_embedding(k=5990, g_type='adj'):
-    fname = 'SpectralEmbedding.csv'
-    preload = load_csv(fname)
     if g_type == 'adj':
+        fname = 'SpectralEmbedding.csv'
         preload = load_csv(fname)
         if preload is None:
-            print('Run spectralembedding on Graph_Matrix.csv')
             matrix = load_graph(shape_match=True,g_type=g_type)
-            features = 5990
-            # I reduced the number of feature to 5990 to handle an issue with
-            # using Sklearn Spectral embedding with n_components = matrix size
-            # Issue is with eigsh
+            features, f_test = 1000, 500
+            print('Running SpectralEmbedding for Graph_Matrix.csv with {} features'.format(features))
             preload = SpectralEmbedding(n_components=features, affinity='precomputed').fit_transform(matrix)
+            print('Also Running SpectralEmbedding with {} features for sanity check'.format(f_test))
+            p_test = SpectralEmbedding(n_components=f_test, affinity='precomputed').fit_transform(matrix)
             np.savetxt(fname, np.asarray(preload), delimiter=",", fmt='%.4f')
             print('Saved ' + fname)
+            print('Sanity Check: Eigen Vectors are the same even if computed with different features: {}'.format('Passed' if np.allclose(preload[:,:f_test], p_test) else 'Failed'))
     elif g_type == 'dist':
         fname = 'SpectralEmbeddingDist.csv'
         preload = load_csv(fname)
         if preload is None:
             matrix = load_graph(shape_match=True, g_type=g_type)
-            features, f_test = 10000, 500
+            features, f_test = 1000, 500
             print('Running SpectralEmbedding for Graph_Dist_Matrix.csv with {} features'.format(features))
             preload = SpectralEmbedding(n_components=features, affinity='precomputed').fit_transform(matrix)
             print('Also Running SpectralEmbedding with {} features for sanity check'.format(f_test))
             p_test = SpectralEmbedding(n_components=f_test, affinity='precomputed').fit_transform(matrix)
             np.savetxt(fname, np.asarray(preload), delimiter=",", fmt='%.4f')
-            np.savetxt('SpectralEmbeddingDistTest.csv', np.asarray(p_test), delimiter=",", fmt='%.4f')
+            # np.savetxt('SpectralEmbeddingDistTest.csv', np.asarray(p_test), delimiter=",", fmt='%.4f')
+            print('Saved ' + fname)
+            print('Sanity Check: Eigen Vectors are the same even if computed with different features: {}'.format('Passed' if np.allclose(preload[:,:f_test], p_test) else 'Failed'))
+    elif g_type == 'merged':
+        fname = 'SpectralEmbeddingMerged.csv'
+        preload = load_csv(fname)
+        if preload is None:
+            matrix = load_merged_graph_matrix()
+            features, f_test = 1000, 500
+            print('Running SpectralEmbedding for Graph_Matrix_Merged.csv with {} features'.format(features))
+            preload = SpectralEmbedding(n_components=features, affinity='precomputed').fit_transform(matrix)
+            print('Also Running SpectralEmbedding with {} features for sanity check'.format(f_test))
+            p_test = SpectralEmbedding(n_components=f_test, affinity='precomputed').fit_transform(matrix)
+            np.savetxt(fname, np.asarray(preload), delimiter=",", fmt='%.4f')
+            # np.savetxt('SpectralEmbeddingMergedTest.csv', np.asarray(p_test), delimiter=",", fmt='%.4f')
             print('Saved ' + fname)
             print('Sanity Check: Eigen Vectors are the same even if computed with different features: {}'.format('Passed' if np.allclose(preload[:,:f_test], p_test) else 'Failed'))
 
@@ -261,6 +278,23 @@ def load_CCA_features(k=8, onlyseeds=False):
     else:
         return preload
 
+# Produces the multiplied sum of
+def load_merged_graph_matrix():
+    preload = load_csv('Graph_Matrix_Merged.csv')
+    if preload is None:
+        D = load_graph(shape_match=True, g_type='dist')[:6000, :6000]
+        G = load_graph(shape_match=True, g_type='adj')
+        assert D.shape == G.shape == (6000,6000), '{} {}'.format(D.shape, G.shape)
+        for i in range(G.shape[0]):
+            for j in range(G.shape[1]):
+                D[i,j] *= G[i,j]
+        np.savetxt('Graph_Matrix_Merged.csv',  np.asarray(D), delimiter=",")
+        return D
+    else:
+        return preload
+
+
+
 
 if __name__ == '__main__':
     print("Visible functions")
@@ -279,6 +313,10 @@ if __name__ == '__main__':
     print("Default k = 1084, onlyseeds = False         with k components. onlyseeds is also an allowed arg")
     print("load_spectral_embedding(k, gtype='adj')   : Loads the SpectralEmbedding of load_graph(shape_match=True)")
     print("                                            with k components")
-    print("                                            g_type='dist' will load the SpectralEmbedding")
+    print("                                            g_type='dist' will load the SpectralEmbedding of Graph_Dist_Matrix")
+    print("                                            g_type='merged' will load the SpectralEmbedding of Graph_Matrix_Merged")
+    print("load_merged_graph_matrix()                : Loads the merged matrix of Graph_Matrix and Graph_Dist_Matrix")
+    print("                                            such that M[i,j] = D[i,j] * G[i,j]")
     print("Running Unit Tests (This will take a while): ...")
+    # load_merged_graph_matrix()
     unittests()
