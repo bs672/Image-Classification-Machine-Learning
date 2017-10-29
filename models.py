@@ -140,6 +140,7 @@ def purity_score(clusters, classes):
     :returns: the purity score
     :rtype: float
     """
+
     A = np.c_[(np.array([clusters[index-1] for index, label in classes]), classes)]
 
     n_accurate = 0.

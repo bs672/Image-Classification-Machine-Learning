@@ -1,6 +1,7 @@
 import numpy as np
 import os
 import pandas as pd
+from sklearn.preprocessing import StandardScaler
 from sklearn.decomposition import PCA
 from sklearn.manifold import SpectralEmbedding
 
@@ -31,6 +32,8 @@ def unittests():
     spec = load_spectral_embedding()
     cca_f = load_CCA_features(k = 8)
     cca_f_seed = load_CCA_features(k = 8, onlyseeds=True)
+    g_dist = load_graph(shape_match=True, g_type='dist')
+    s_dist = load_spectral_embedding(k=10, g_type='dist')
     for f in fnames:
         assert os.path.isfile(f), "{} should be a file".format(f)
     assert g.shape == (7064950, 2), 'Graph has wrong size: {} should be (7064950, 2)'.format(g.shape)
@@ -46,6 +49,8 @@ def unittests():
     assert e_seeds_pca.shape == e_seeds.shape, '{} should be {}'.format(e_seeds_pca.shape, e_seeds.shape)
     assert cca_f.shape == (10000,8)
     assert cca_f_seed.shape == (60,8)
+    assert g_dist.shape == (10000,10000)
+    assert s_dist.shape == (10000,10)
     # for i in range(1,101):
     #     temp = load_extracted_features_PCA(k=i)
     #     temp_seeds = load_extracted_features_PCA(k=i, onlyseeds=True)
@@ -76,32 +81,38 @@ def load_csv(fname):
 def check_symmetric(a, tol=1e-8):
     return np.allclose(a, a.T, atol=tol)
 
-def load_graph(fname='Graph', shape_match=False,type='adj'):
+def load_graph(fname='Graph', shape_match=False, g_type='adj'):
     if shape_match:
-        if type == 'dist':
+        if g_type == 'dist':
             fname = fname + '_Dist'
         preload = load_csv(fname+'_Matrix.csv')
         if preload is not None:
-            # print("Average Similarity : {}".format((preload.sum())/(6000.0**2)))
             return preload
         else:
-            # Outputs a (6000, 6000) data sets with the similarity values
-            # Note that this is 2.5 times the regular size of G
-            g = np.array(load_csv(fname+'.csv'), dtype='int')
-            lower, upper = min(min(i, j) for i, j in g), max(max(i, j) for i, j in g)
-            # print("Average Similarity should be : {}".format((7064950+6000)/(6000.0**2)))
-            print("Lower and Upper index {}".format((lower,upper)))
-            size = upper - lower + 1
-            print("Size {}".format(size))
-            output = np.identity(size, dtype='int')
-            # Identity used because we should consider a point to be similar to itself
-            for edge in g:
-                output[edge[0]-lower, edge[1]-lower] = 1
-            if type == 'dist':
-                #TODO: put changes here
-            print("Saving new similarity values as a matrix: {}_Matrix.csv".format(fname))
-            # print("Average Similarity is : {}".format(output.sum()/(6000.0**2)))
-            np.savetxt(fname+'_Matrix.csv',  np.asarray(output), delimiter=",", fmt='%d')
+            if g_type == 'dist':
+                # Creates a distance matrix, ala lecture notes
+                X = load_extracted_features_PCA(k=10)
+                size = X.shape[0]
+                output = np.zeros((size,size))
+                def A(x1,x2):
+                    return np.exp(-(np.linalg.norm(x1-x2)**2))
+                for i in range(size):
+                    for j in range(size):
+                        output[i,j] = A(X[i],X[j])
+                print("Saving new distance values as a matrix: {}_Matrix.csv".format(fname))
+                np.savetxt(fname+'_Matrix.csv',  np.asarray(output), delimiter=",", fmt='%.4f')
+            else:
+                g = np.array(load_csv(fname+'.csv'), dtype='int')
+                lower, upper = min(min(i, j) for i, j in g), max(max(i, j) for i, j in g)
+                print("Lower and Upper index {}".format((lower,upper)))
+                size = upper - lower + 1
+                print("Size {}".format(size))
+                output = np.identity(size, dtype='int')
+                # Identity used because we should consider a point to be similar to itself
+                for edge in g:
+                    output[edge[0]-lower, edge[1]-lower] = 1
+                print("Saving new similarity values as a matrix: {}_Matrix.csv".format(fname))
+                np.savetxt(fname+'_Matrix.csv',  np.asarray(output), delimiter=",", fmt='%d')
             print('Saved ' + fname+'_Matrix.csv')
             return output
     else:
@@ -128,7 +139,7 @@ def load_extracted_features_PCA(k=1084, onlyseeds=False):
     preload = load_csv(fname)
     if preload is None:
         print('Running PCA on extracted_features{}'.format(k))
-        X = load_extracted_features()
+        X = StandardScaler(with_std=False).fit_transform(load_extracted_features())
         preload = PCA(n_components=k).fit_transform(X)
         np.savetxt(fname, np.asarray(preload), delimiter=",", fmt='%.5f')
         print('Saved ' + fname)
@@ -168,21 +179,35 @@ def load_seed_matrix(fname='Seed_Matrix'):
         print('Saved ' + fname+'.csv')
         return output
 
-def load_spectral_embedding(k=5990,type='adj'):
+def load_spectral_embedding(k=5990, g_type='adj'):
     fname = 'SpectralEmbedding.csv'
-    if type == 'dist':
-        fname = 'SpectralEmbeddingDist.csv'
     preload = load_csv(fname)
-    if preload is None:
-        print('Run spectralembedding on Graph_Matrix.csv')
-        matrix = load_graph(shape_match=True,type=type)
-        features = 5990
-        # I reduced the number of feature to 5990 to handle an issue with
-        # using Sklearn Spectral embedding with n_components = matrix size
-        # Issue is with eigsh
-        preload = SpectralEmbedding(n_components=features).fit_transform(matrix)
-        np.savetxt(fname, np.asarray(preload), delimiter=",", fmt='%.4f')
-        print('Saved ' + fname)
+    if g_type == 'adj':
+        preload = load_csv(fname)
+        if preload is None:
+            print('Run spectralembedding on Graph_Matrix.csv')
+            matrix = load_graph(shape_match=True,g_type=g_type)
+            features = 5990
+            # I reduced the number of feature to 5990 to handle an issue with
+            # using Sklearn Spectral embedding with n_components = matrix size
+            # Issue is with eigsh
+            preload = SpectralEmbedding(n_components=features, affinity='precomputed').fit_transform(matrix)
+            np.savetxt(fname, np.asarray(preload), delimiter=",", fmt='%.4f')
+            print('Saved ' + fname)
+    elif g_type == 'dist':
+        fname = 'SpectralEmbeddingDist.csv'
+        preload = load_csv(fname)
+        if preload is None:
+            matrix = load_graph(shape_match=True, g_type=g_type)
+            features, f_test = 10000, 500
+            print('Running SpectralEmbedding for Graph_Dist_Matrix.csv with {} features'.format(features))
+            preload = SpectralEmbedding(n_components=features, affinity='precomputed').fit_transform(matrix)
+            print('Also Running SpectralEmbedding with {} features for sanity check'.format(f_test))
+            p_test = SpectralEmbedding(n_components=f_test, affinity='precomputed').fit_transform(matrix)
+            np.savetxt(fname, np.asarray(preload), delimiter=",", fmt='%.4f')
+            np.savetxt('SpectralEmbeddingDistTest.csv', np.asarray(p_test), delimiter=",", fmt='%.4f')
+            print('Saved ' + fname)
+            print('Sanity Check: Eigen Vectors are the same even if computed with different features: {}'.format('Passed' if np.allclose(preload[:,:f_test], p_test) else 'Failed'))
 
     true_k = min(k, preload.shape[1])
     output = preload[:, :true_k] # Get the k first eigens of PCA output
@@ -241,16 +266,19 @@ if __name__ == '__main__':
     print("Visible functions")
     print("load_extracted_features(onlyseeds=False)  : Load Extracted_features.csv as a numpy array")
     print("                                            onlyseeds will load only features of seeds")
-    print("load_graph(shape_match=False)             : Load Graph.csv as a numpy array")
+    print("load_graph(shape_match=False, gtype='adj'): Load Graph.csv as a numpy array")
     print("                                            shape_match will make it a 6000x6000 adjacency matrix")
     print("                                            A point(i,j) = 1 if element i and j are similar")
+    print("                                            g_type='dist' will make it a distance matrix using ")
+    print("                                            10 features from PCA output of extracted_features ")
     print("load_seed()                               : Load Seed.csv into a numpy array")
     print("load_seed_similarity()                    : Load Seed_Similarity.csv into a numpy array")
     print("load_seed_matrix()                        : Loads an adjacency matrix of Seeds")
     print("                                            A point(i,j) = 1 if Seed i and Seed j are the same label")
     print("load_extracted_features_PCA(k, onlyseeds) : Loads the PCA output of Extracted_features.csv")
     print("Default k = 1084, onlyseeds = False         with k components. onlyseeds is also an allowed arg")
-    print("load_spectral_embedding(k)                : Loads the SpectralEmbedding of load_graph(shape_match=True)")
+    print("load_spectral_embedding(k, gtype='adj')   : Loads the SpectralEmbedding of load_graph(shape_match=True)")
     print("                                            with k components")
+    print("                                            g_type='dist' will load the SpectralEmbedding")
     print("Running Unit Tests (This will take a while): ...")
     unittests()
