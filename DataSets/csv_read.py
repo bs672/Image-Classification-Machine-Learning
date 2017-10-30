@@ -19,7 +19,8 @@ from sklearn.manifold import SpectralEmbedding
 
 def unittests():
     fnames = ['Seed_Similarity.csv', 'Seed.csv', 'Seed_Matrix.csv', 'Graph.csv', 'Graph_Matrix.csv',
-                'Extracted_features.csv', 'SpectralEmbedding.csv']
+                'Extracted_features.csv', 'SpectralEmbedding.csv', 'SpectralEmbeddingDist.csv',
+                'SpectralEmbeddingMerged.csv', 'Graph_Dist_Matrix.csv']
     g = load_graph()
     g_s = load_graph(shape_match = True)
     e = load_extracted_features()
@@ -30,8 +31,6 @@ def unittests():
     e_pca = load_extracted_features_PCA()
     e_seeds_pca = load_extracted_features_PCA(onlyseeds=True)
     spec = load_spectral_embedding()
-    # cca_f = load_CCA_features(k = 8)
-    # cca_f_seed = load_CCA_features(k = 8, onlyseeds=True)
     g_dist = load_graph(shape_match=True, g_type='dist')
     s_dist = load_spectral_embedding(k=10, g_type='dist')
     g_merged = load_merged_graph_matrix()
@@ -55,18 +54,28 @@ def unittests():
     assert s_dist.shape == (10000,10)
     assert g_merged.shape == (6000,6000)
     assert s_merged.shape == (6000, 10)
-    # for i in range(1,101):
-    #     temp = load_extracted_features_PCA(k=i)
-    #     temp_seeds = load_extracted_features_PCA(k=i, onlyseeds=True)
-    #     for s_i in range(s.shape[0]):
-    #         assert np.allclose(temp_seeds[s_i], temp[s[s_i][0]-1], atol=0.0001), '{} vs {}'.format(temp_seeds[s_i], temp[s[s_i][0]-1])
 
-    for i in range(60):
-        for j in range(60):
-            if s_m[i,j]: assert s[i][1] == s[j][1]
-    # assert spec.shape == g_s.shape, 'SpectralEmbedding should match Graph Matrix'
+    # Testing subset functions
 
+    subset = range(10,1000,2)
+    g = load_graph(subset=subset)
+    g_s = load_graph(shape_match = True, subset=subset)
+    e = load_extracted_features(subset=subset)
+    e_pca = load_extracted_features_PCA(subset=subset)
+    spec = load_spectral_embedding(subset=subset)
+    g_dist = load_graph(shape_match=True, g_type='dist', subset=subset)
+    s_dist = load_spectral_embedding(k=10, g_type='dist', subset=subset)
+    l = len(subset)
+    assert g.shape == (l, 2), 'Graph has wrong size: {} should be (7064950, 2)'.format(g.shape)
+    assert g_s.shape == (l, l), 'Graph Similarity Matrix has wrong size: {} should be ({},{})'.format(g_s.shape,l,l)
+    assert check_symmetric(g_s), 'Graph Similarity Matrix is not symmetric'
+    assert e.shape == (l,1084), 'Extracted_features has wrong size: {} should be ({},1084)'.format(e.shape, l)
+    assert e_pca.shape == e.shape, 'Extracted_features_PCA should match Extracted_features'
+
+    subset = s[:,1] - 1
+    assert load_extracted_features(onlyseeds=True) == load_extracted_features(subset)
     print('Passed')
+
 
 # Load-csv is the general function.
 # Returns a numpy array containing the values in fname
@@ -85,7 +94,9 @@ def load_csv(fname):
 def check_symmetric(a, tol=1e-8):
     return np.allclose(a, a.T, atol=tol)
 
-def load_graph(fname='Graph', shape_match=False, g_type='adj'):
+# For subset, I'm assuming only one iterable. If you want a pair of iterables to
+# loop through the matrix output, please let me know @Diyv
+def load_graph(fname='Graph', shape_match=False, g_type='adj', subset=None):
     if shape_match:
         if g_type == 'dist':
             fname = fname + '_Dist'
@@ -94,35 +105,56 @@ def load_graph(fname='Graph', shape_match=False, g_type='adj'):
             return preload
         else:
             if g_type == 'dist':
-                # Creates a distance matrix, ala lecture notes
-                X = load_extracted_features_PCA(k=10)
-                size = X.shape[0]
-                output = np.zeros((size,size))
                 def A(x1,x2):
                     return np.exp(-(np.linalg.norm(x1-x2)**2))
-                for i in range(size):
-                    for j in range(size):
-                        output[i,j] = A(X[i],X[j])
-                print("Saving new distance values as a matrix: {}_Matrix.csv".format(fname))
-                np.savetxt(fname+'_Matrix.csv',  np.asarray(output), delimiter=",")
+                # Creates a distance matrix, ala lecture notes
+                X = load_extracted_features_PCA(k=10)
+                size = len(subset) if subset else X.shape[0]
+                output = np.zeros((size,size))
+                if subset:
+                    for i, index_i in enumerate(subset):
+                        for j, index_j in enumerate(subset):
+                            output[i,j] = A(X[index_i],X[index_j])
+                    print('Not saving Distance matrix because it is a subset')
+                else:
+                    for i in range(size):
+                        for j in range(size):
+                            output[i,j] = A(X[i],X[j])
+                    print("Saving new distance values as a matrix: {}_Matrix.csv".format(fname))
+                    np.savetxt(fname+'_Matrix.csv',  np.asarray(output), delimiter=",")
             else:
                 g = np.array(load_csv(fname+'.csv'), dtype='int')
+                if subset:
+                    g = np.array([g[i] for i in subset],dtype='int')
                 lower, upper = min(min(i, j) for i, j in g), max(max(i, j) for i, j in g)
-                print("Lower and Upper index {}".format((lower,upper)))
+                # print("Lower and Upper index {}".format((lower,upper)))
                 size = upper - lower + 1
-                print("Size {}".format(size))
+                # print("Size {}".format(size))
                 output = np.identity(size, dtype='int')
                 # Identity used because we should consider a point to be similar to itself
                 for edge in g:
                     output[edge[0]-lower, edge[1]-lower] = 1
-                print("Saving new similarity values as a matrix: {}_Matrix.csv".format(fname))
-                np.savetxt(fname+'_Matrix.csv',  np.asarray(output), delimiter=",", fmt='%d')
-            print('Saved ' + fname+'_Matrix.csv')
+                if subset:
+                    print('Not saving ADJ matrix because it is a subset')
+                else:
+                    print("Saving new similarity values as a matrix: {}_Matrix.csv".format(fname))
+                    np.savetxt(fname+'_Matrix.csv',  np.asarray(output), delimiter=",", fmt='%d')
             return output
-    else:
-        return np.array(load_csv(fname+'.csv'), dtype='int')
 
-def load_extracted_features(onlyseeds=False):
+    else:
+        if subset:
+            G = np.array(load_csv(fname+'.csv'), dtype='int')
+            output = np.zeros((len(subset), 2), dtype='int')
+            for i, index in enumerate(subset):
+                output[i] = G[index]
+            return output
+        else:
+            return np.array(load_csv(fname+'.csv'), dtype='int')
+
+# onlyseeds =True will return just features for the labeled seeds
+# subset = iterable will return all listed data points in extracted_features
+# These args are exclusive from eachother
+def load_extracted_features(onlyseeds=False, subset=None):
     if onlyseeds:
         X = load_csv('Extracted_features.csv')
         S = load_seed()
@@ -132,27 +164,49 @@ def load_extracted_features(onlyseeds=False):
             output[i] = X[index-1]
             i += 1
         return output
-    return load_csv('Extracted_features.csv')
+    elif subset:
+        X = load_csv('Extracted_features.csv')
+        output = np.zeros((len(subset),1084))
+        for i, index in enumerate(subset):
+            # Please ensure subset is a valid iterable
+            output[i] = X[index]
+        return output
+    else:
+        return load_csv('Extracted_features.csv')
 
 # Loads extracted features with PCA selected k features
 # Uses a preloaded .csv of PCA run for all components
 # You want to run PCA separately of each amount of components because
 # Accuracy tends to differ in lower dimensions
-def load_extracted_features_PCA(k=1084, onlyseeds=False):
+
+# @Diyv: Added subset argument so you can pass an iterable (e.g range(x))
+# Note that this will clash with wanting to pull only the seeds
+# If say, you wanted to get only the seeds and run PCA on them, you should use
+# two separate functions calls, e.g
+
+# X = StandardScaler(with_std=False).fit_transform(load_extracted_features(onlyseeds=True))
+# PCAONSEEDS = KernelPCA(n_components=k, kernel='rbf', gamma=1.0, n_jobs=-1).fit_transform(X)
+
+def load_extracted_features_PCA(k=1084, onlyseeds=False, subset=None):
     fname = "Extracted_features_PCA{}.csv".format(k)
     preload = load_csv(fname)
-    if preload is None:
+
+    if preload is None or subset is not None:
         print('Running PCA on extracted_features{}'.format(k))
-        X = StandardScaler(with_std=False).fit_transform(load_extracted_features())
+        X = StandardScaler(with_std=False).fit_transform(load_extracted_features(subset=subset))
         preload = KernelPCA(n_components=k, kernel='rbf', gamma=1.0, n_jobs=-1).fit_transform(X)
-        np.savetxt(fname, np.asarray(preload), delimiter=",", fmt='%.5f')
-        print('Saved ' + fname)
+        if subset is None:
+            np.savetxt(fname, np.asarray(preload), delimiter=",", fmt='%.5f')
+            print('Saved ' + fname)
+        else:
+            print('Not saving {} because PCA was run on a subset of extracted features'.format(fname))
 
     if onlyseeds:
+        # Just note that using 'subset' arg may cause an exception with onlyseeds
+        # if your subset doesn't include all seeds
         s = load_seed()
         preload_seeds = np.zeros((s.shape[0],k))
         for i in range(s.shape[0]):
-            # print(s[i][0])
             preload_seeds[i] = preload[s[i][0]-1]
         preload = preload_seeds
 
@@ -183,47 +237,52 @@ def load_seed_matrix(fname='Seed_Matrix'):
         print('Saved ' + fname+'.csv')
         return output
 
-def load_spectral_embedding(k=5990, g_type='adj'):
+def load_spectral_embedding(k=5990, g_type='adj', subset=None):
+    features, f_test = 1000, 500 # Change these defaults at leisure
     if g_type == 'adj':
         fname = 'SpectralEmbedding.csv'
         preload = load_csv(fname)
         if preload is None:
-            matrix = load_graph(shape_match=True,g_type=g_type)
-            features, f_test = 1000, 500
+            matrix = load_graph(shape_match=True, g_type=g_type, subset=subset)
             print('Running SpectralEmbedding for Graph_Matrix.csv with {} features'.format(features))
             preload = SpectralEmbedding(n_components=features, affinity='precomputed', n_jobs=-1).fit_transform(matrix)
             print('Also Running SpectralEmbedding with {} features for sanity check'.format(f_test))
             p_test = SpectralEmbedding(n_components=f_test, affinity='precomputed', n_jobs=-1).fit_transform(matrix)
-            np.savetxt(fname, np.asarray(preload), delimiter=",", fmt='%.4f')
-            print('Saved ' + fname)
+            if subset is None:
+                np.savetxt(fname, np.asarray(preload), delimiter=",", fmt='%.4f')
+                print('Saved ' + fname)
+            else:
+                print('Not saving {} because SpectralEmbedding was run on a subset'.format(fname))
             print('Sanity Check: Eigen Vectors are the same even if computed with different features: {}'.format('Passed' if np.allclose(preload[:,:f_test], p_test) else 'Failed'))
     elif g_type == 'dist':
         fname = 'SpectralEmbeddingDist.csv'
         preload = load_csv(fname)
         if preload is None:
-            matrix = load_graph(shape_match=True, g_type=g_type)
-            features, f_test = 1000, 500
+            matrix = load_graph(shape_match=True, g_type=g_type, subset=subset)
             print('Running SpectralEmbedding for Graph_Dist_Matrix.csv with {} features'.format(features))
             preload = SpectralEmbedding(n_components=features, affinity='precomputed', n_jobs=-1).fit_transform(matrix)
             print('Also Running SpectralEmbedding with {} features for sanity check'.format(f_test))
             p_test = SpectralEmbedding(n_components=f_test, affinity='precomputed', n_jobs=-1).fit_transform(matrix)
-            np.savetxt(fname, np.asarray(preload), delimiter=",", fmt='%.4f')
-            # np.savetxt('SpectralEmbeddingDistTest.csv', np.asarray(p_test), delimiter=",", fmt='%.4f')
-            print('Saved ' + fname)
+            if subset is None:
+                np.savetxt(fname, np.asarray(preload), delimiter=",", fmt='%.4f')
+                print('Saved ' + fname)
+            else:
+                print('Not saving {} because SpectralEmbedding was run on a subset'.format(fname))
             print('Sanity Check: Eigen Vectors are the same even if computed with different features: {}'.format('Passed' if np.allclose(preload[:,:f_test], p_test) else 'Failed'))
     elif g_type == 'merged':
         fname = 'SpectralEmbeddingMerged.csv'
         preload = load_csv(fname)
         if preload is None:
-            matrix = load_merged_graph_matrix()
-            features, f_test = 1000, 500
+            matrix = load_merged_graph_matrix(subset=subset)
             print('Running SpectralEmbedding for Graph_Matrix_Merged.csv with {} features'.format(features))
             preload = SpectralEmbedding(n_components=features, affinity='precomputed', n_jobs=-1).fit_transform(matrix)
             print('Also Running SpectralEmbedding with {} features for sanity check'.format(f_test))
             p_test = SpectralEmbedding(n_components=f_test, affinity='precomputed', n_jobs=-1).fit_transform(matrix)
-            np.savetxt(fname, np.asarray(preload), delimiter=",", fmt='%.4f')
-            # np.savetxt('SpectralEmbeddingMergedTest.csv', np.asarray(p_test), delimiter=",", fmt='%.4f')
-            print('Saved ' + fname)
+            if subset is None:
+                np.savetxt(fname, np.asarray(preload), delimiter=",", fmt='%.4f')
+                print('Saved ' + fname)
+            else:
+                print('Not saving {} because SpectralEmbedding was run on a subset'.format(fname))
             print('Sanity Check: Eigen Vectors are the same even if computed with different features: {}'.format('Passed' if np.allclose(preload[:,:f_test], p_test) else 'Failed'))
 
     true_k = min(k, preload.shape[1])
@@ -294,16 +353,19 @@ def load_data_features(fname, onlyseeds=False):
         return preload
 
 # Produces the multiplied sum of
-def load_merged_graph_matrix():
+def load_merged_graph_matrix(subset=None):
     preload = load_csv('Graph_Matrix_Merged.csv')
-    if preload is None:
-        D = load_graph(shape_match=True, g_type='dist')[:6000, :6000]
-        G = load_graph(shape_match=True, g_type='adj')
-        assert D.shape == G.shape == (6000,6000), '{} {}'.format(D.shape, G.shape)
+    if preload is None or subset is None:
+        D = load_graph(shape_match=True, g_type='dist', subset=subset)
+        G = load_graph(shape_match=True, g_type='adj', subset=subset)
+        assert D.shape == G.shape, '{} {}'.format(D.shape, G.shape)
         for i in range(G.shape[0]):
             for j in range(G.shape[1]):
                 D[i,j] *= G[i,j]
-        np.savetxt('Graph_Matrix_Merged.csv',  np.asarray(D), delimiter=",")
+        if subset is None:
+            np.savetxt('Graph_Matrix_Merged.csv',  np.asarray(D), delimiter=",")
+        else:
+            print('Not saving Graph_Matrix_Merged.csv when composed from subset')
         print('New Graph is symmetric: {}'.format(check_symmetric(D)))
         return D
     else:
