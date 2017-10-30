@@ -105,17 +105,15 @@ class CCACluster():
 
         count = 0
         l = []
-        len = test.ccaCV.comps[0].shape[0]
+        len = self.ccaCV.comps[0].shape[0]
         for i in range(len):
-            a = test.ccaCV.comps[0][i]
-            b = test.ccaCV.comps[1][i]
+            a = self.ccaCV.comps[0][i]
+            b = self.ccaCV.comps[1][i]
             if abs(pearsonr(a,b)[0]) < threshold:
                 l.append(i)
                 count = count + 1
         print('{} values were found to uncorrelated'.format(count))
         return l
-
-
 
     def predict(self):
         if self.ccaCV is None:
