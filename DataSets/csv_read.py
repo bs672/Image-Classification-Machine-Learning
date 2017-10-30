@@ -33,7 +33,7 @@ def unittests():
     spec = load_spectral_embedding()
     g_dist = load_graph(shape_match=True, g_type='dist')
     s_dist = load_spectral_embedding(k=10, g_type='dist')
-    g_merged = load_merged_graph_matrix()
+    # g_merged = load_merged_graph_matrix() # DONT USE
     s_merged = load_spectral_embedding(k=10, g_type='merged')
     for f in fnames:
         assert os.path.isfile(f), "{} should be a file".format(f)
@@ -52,7 +52,7 @@ def unittests():
     # assert cca_f_seed.shape == (60,8)
     assert g_dist.shape == (10000,10000)
     assert s_dist.shape == (10000,10)
-    assert g_merged.shape == (6000,6000), str(g_merged.shape)
+    # assert g_merged.shape == (6000,6000), str(g_merged.shape)
     assert s_merged.shape == (6000, 10)
 
     # Testing subset functions
@@ -69,7 +69,7 @@ def unittests():
     assert g.shape == (l, 2), 'Graph has wrong size: {} should be (7064950, 2)'.format(g.shape)
     assert check_symmetric(g_s), 'Graph Similarity Matrix is not symmetric'
     assert e.shape == (l,1084), 'Extracted_features has wrong size: {} should be ({},1084)'.format(e.shape, l)
-    assert e_pca.shape == e.shape, 'Extracted_features_PCA should match Extracted_features'
+    # assert e_pca.shape == e.shape, 'Extracted_features_PCA should match Extracted_features'
 
     subset = s[:,1] - 1
     assert load_extracted_features(onlyseeds=True) == load_extracted_features(subset)
@@ -106,21 +106,27 @@ def load_graph(fname='Graph', shape_match=False, g_type='adj', subset=None):
             if g_type == 'dist':
                 def A(x1,x2):
                     return np.exp(-(np.linalg.norm(x1-x2)**2))
+                def B(x1,x2):
+                    return np.linalg.norm(x1-x2)
                 # Creates a distance matrix, ala lecture notes
-                X = load_extracted_features_PCA(k=10)
+                X = load_extracted_features_PCA(k=30)
                 size = len(subset) if subset else X.shape[0]
                 output = np.zeros((size,size))
+                outputB = np.zeros((size,size))
                 if subset:
                     for i, index_i in enumerate(subset):
                         for j, index_j in enumerate(subset):
                             output[i,j] = A(X[index_i],X[index_j])
+                            outputB[i,j] = B(X[index_i],X[index_j])
                     print('Not saving Distance matrix because it is a subset')
                 else:
                     for i in range(size):
                         for j in range(size):
-                            output[i,j] = A(X[i],X[j])
+                            output[i,j] = A(X[index_i],X[index_j])
+                            outputB[i,j] = B(X[index_i],X[index_j])
                     print("Saving new distance values as a matrix: {}_Matrix.csv".format(fname))
                     np.savetxt(fname+'_Matrix.csv',  np.asarray(output), delimiter=",")
+                    np.savetxt(fname+'_Matrix_B.csv',  np.asarray(outputB), delimiter=",")
             else:
                 g = np.array(load_csv(fname+'.csv'), dtype='int')
                 if subset: g = np.array([g[i] for i in subset],dtype='int')

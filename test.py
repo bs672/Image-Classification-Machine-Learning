@@ -31,22 +31,42 @@ from sklearn.preprocessing import StandardScaler, scale
 from sklearn.manifold import SpectralEmbedding, TSNE
 from sklearn.cross_decomposition import CCA
 from csv_read import load_extracted_features, load_graph, load_seed, load_csv
+from Comp import CCACluster
 
+e_Dist = load_csv('Graph_Matrix_Edge_Distance.csv')
+f_Dist = load_graph(shape_match=True, g_type='dist')
 
-preload = load_csv('HopeThisWorks.csv')
-if preload is not None:
-    np.savetxt('Graph_Matrix_Edge_Distance.csv', np.asarray(preload), delimiter=",", fmt='%d')
-else:
-    X = load_extracted_features(subset = range(6000))
-    assert X.shape == (6000, 1084)
-    matrix = load_graph(shape_match=True)
-    seeds = load_seed()
-    output = dijkstra(csr_matrix(matrix), directed=False)
-    out_max = np.nanmax(output) + 1
-    print('Going to change NaN to {}'.format(out_max))
-    output[np.isnan(output)] = out_max
-    print('Done: output shape {}'.format(output.shape))
-    np.savetxt('Graph_Matrix_Edge_Distance.csv', np.asarray(output), delimiter=",", fmt='%d')
+# Running with no preembedding
+# Fails bad
+# ccacluster = CCACluster(f_Dist[:,:6000], e_Dist, k_PCA = 6000, k_SE=6000)
+# cca = CCA(n_components=8)
+# cca.fit(f_Dist[:6000], e_Dist[:6000])
+# ccacluster.cca_predictions = cca.transform(f_Dist[6000:])
+# ccacluster.save_predictions()
+
+e_Dist_spec = SpectralEmbedding(n_components=100, affinity='precomputed', n_jobs=-1).fit_transform(e_Dist)
+f_Dist_spec = SpectralEmbedding(n_components=100, affinity='precomputed', n_jobs=-1).fit_transform(f_Dist)
+# print(f_Dist_spec.shape)
+ccacluster = CCACluster(f_Dist_spec, e_Dist_spec, k_PCA = 100, k_SE=100)
+# ccacluster.save_predictions()
+
+print('Now with 10 components')
+ccacluster.k_CCA = 10
+ccacluster.cca_predictions = None
+ccacluster.save_predictions()
+# if preload is not None:
+#     np.savetxt('Graph_Matrix_Edge_Distance.csv', np.asarray(preload), delimiter=",", fmt='%d')
+# else:
+#     X = load_extracted_features(subset = range(6000))
+#     assert X.shape == (6000, 1084)
+#     matrix = load_graph(shape_match=True)
+#     seeds = load_seed()
+#     output = dijkstra(csr_matrix(matrix), directed=False)
+#     out_max = np.nanmax(output) + 1
+#     print('Going to change NaN to {}'.format(out_max))
+#     output[np.isnan(output)] = out_max
+#     print('Done: output shape {}'.format(output.shape))
+#     np.savetxt('Graph_Matrix_Edge_Distance.csv', np.asarray(output), delimiter=",", fmt='%d')
 
 
 

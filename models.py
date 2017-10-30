@@ -18,8 +18,8 @@ from keras.losses import binary_crossentropy
 from data_gen import seed_generator, seed_validation, siamese_sanity_check, seed_similarity_generator, siamese_sanity_check_symmetry
 from csv_read import load_seed, load_data_features
 
-k = 8
-FNAME = 'CCAGraphPred-{}-500-500'.format(k)
+k = 10
+FNAME = 'CCAGraphPred-{}-100-100'.format(k)
 print('Reading from {}.csv'.format(FNAME))
 print('Saving to {}.hdf5'.format(FNAME))
 # Test2 has greater gaussian noise and more dropout
@@ -89,6 +89,7 @@ seeds = load_seed()
 seed_features = load_data_features(fname=FNAME, onlyseeds=True)
 features = load_data_features(fname=FNAME)
 nums = features.shape[0]
+print(nums)
 s = seed_features.shape[0]
 input1 = np.empty(
     (s, ) + input_shape)
@@ -96,7 +97,7 @@ input2 = np.empty(
     (s, ) + input_shape)
 labels_max = np.zeros((nums,2), dtype = 'int')
 labels_sum = np.zeros((nums,2), dtype = 'int')
-confidence = np.zeros((nums,2), dtype = 'float')
+# confidence = np.zeros((nums,2), dtype = 'float')
 for batch in range(nums):
     # initialize input_1
     for i in range(s):
@@ -113,7 +114,7 @@ for batch in range(nums):
     labels_sum[batch] = np.array([batch+1, np.argmax(similarity_sums)], dtype='int')
     labels_max[batch] = np.array([batch+1, seeds[np.argmax(pred)][1]], dtype='int')
     # confidence[batch] = batch+1, np.max(pred)
-    confidence[batch] = batch+1, np.max(similarity_sums)/6.0
+    # confidence[batch] = batch+1, np.max(similarity_sums)/6.0
 print('Performing sanity check: Perfect Seed Labeling')
 
 correctness_max = 0.0
@@ -158,7 +159,7 @@ print('Percentage of correctly clustered seeds via Sum: {}'.format(correctness_s
 # print('Confidence in each prediction via max similarity')
 # for index, c in confidence:
 #     print('Element {} has confidence {:1.3f}'.format(int(index),c))
-# np.savetxt('AllLabels{}viaSum.csv'.format(FNAME), np.asarray(labels_sum), delimiter=',', fmt='%d')
+np.savetxt('AllLabels{}viaSum.csv'.format(FNAME), np.asarray(labels_sum), delimiter=',', fmt='%d')
 np.savetxt('results{}viaSum.csv'.format(FNAME), np.asarray(labels_sum[6000:]), delimiter=',', fmt='%d', header='Id,Label')
-# np.savetxt('AllLabels{}viaMax.csv'.format(FNAME), np.asarray(labels_max), delimiter=',', fmt='%d')
+np.savetxt('AllLabels{}viaMax.csv'.format(FNAME), np.asarray(labels_max), delimiter=',', fmt='%d')
 np.savetxt('results{}viaMax.csv'.format(FNAME), np.asarray(labels_max[6000:]), delimiter=',', fmt='%d', header='Id,Label')

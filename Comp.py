@@ -32,9 +32,9 @@ from csv_read import load_extracted_features_PCA, load_spectral_embedding, load_
 class CCACluster():
 
     # Only define k_CCA if you don't want to automatically determine the best value
-    def __init__(self, k_PCA, k_SE, k_CCA=None, best_reg=None, verbose=True):
-        self.features = load_spectral_embedding(k=k_PCA, g_type='dist')
-        self.graph = load_spectral_embedding(k=k_SE, g_type='adj')
+    def __init__(self, X, Y, k_PCA, k_SE, k_CCA=None, best_reg=None, verbose=True):
+        self.features = X
+        self.graph = Y
         self.seeds = load_seed()
         self.cca_predictions = None
         if verbose: print('Loaded all data')
@@ -57,7 +57,7 @@ class CCACluster():
         if CCrange:
             ccaCV = rcca.CCACrossValidate(kernelcca = False,
                                 numCCs = CCrange,
-                                regs = [0, 1e2, 1e4, 1e6],
+                                regs = [0],
                                 verbose=self.verbose)
         else:
             ccaCV = rcca.CCACrossValidate(kernelcca = False,
@@ -67,7 +67,7 @@ class CCACluster():
 
         if self.features is None or self.graph is None:
             print('What the fuck is this?')
-        ccaCV.train([self.features[:6000], self.graph[:6000]])
+        ccaCV.train([self.features[:6000], self.graph])
         self.k_CCA, self.best_reg = ccaCV.best_numCC, ccaCV.best_reg
         if self.verbose:
             print('Best CCA components: {}'.format(self.k_CCA))
@@ -84,7 +84,7 @@ class CCACluster():
 
     def predict(self):
         if self.k_CCA is None:
-            if verbose: print('Going to compute best components first')
+            if self.verbose: print('Going to compute best components first')
             self.determine_CCA_components()
 
         # self.cca_predictions, _ = self.ccaCV.predict(self.features, self.ccaCV.ws)
@@ -93,6 +93,7 @@ class CCACluster():
         self.cca_predictions = cca.transform(self.features)
         if self.verbose:
             print('Produced predictions')
+            print('Size of predictions {}'.format(self.cca_predictions.shape))
 
     def cluster(self, from_save=None, type='kmeans'):
         if self.cca_predictions is None:
@@ -122,9 +123,10 @@ class CCACluster():
             print('Saved predictions')
 
 if __name__ == '__main__':
-    test = CCACluster(k_PCA = 500, k_SE = 500)
-    test.determine_CCA_components()
-    test.predict()
-    test.cluster()
-    test.save_predictions()
-    # test.cluster(from_save='CCAPred8.csv')
+    pass
+    # test = CCACluster(k_PCA = 500, k_SE = 500)
+    # test.determine_CCA_components()
+    # test.predict()
+    # test.cluster()
+    # test.save_predictions()
+    # # test.cluster(from_save='CCAPred8.csv')
