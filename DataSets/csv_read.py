@@ -52,7 +52,7 @@ def unittests():
     # assert cca_f_seed.shape == (60,8)
     assert g_dist.shape == (10000,10000)
     assert s_dist.shape == (10000,10)
-    assert g_merged.shape == (6000,6000)
+    assert g_merged.shape == (6000,6000), str(g_merged.shape)
     assert s_merged.shape == (6000, 10)
 
     # Testing subset functions
@@ -67,7 +67,6 @@ def unittests():
     s_dist = load_spectral_embedding(k=10, g_type='dist', subset=subset)
     l = len(subset)
     assert g.shape == (l, 2), 'Graph has wrong size: {} should be (7064950, 2)'.format(g.shape)
-    assert g_s.shape == (l, l), 'Graph Similarity Matrix has wrong size: {} should be ({},{})'.format(g_s.shape,l,l)
     assert check_symmetric(g_s), 'Graph Similarity Matrix is not symmetric'
     assert e.shape == (l,1084), 'Extracted_features has wrong size: {} should be ({},1084)'.format(e.shape, l)
     assert e_pca.shape == e.shape, 'Extracted_features_PCA should match Extracted_features'
@@ -124,8 +123,7 @@ def load_graph(fname='Graph', shape_match=False, g_type='adj', subset=None):
                     np.savetxt(fname+'_Matrix.csv',  np.asarray(output), delimiter=",")
             else:
                 g = np.array(load_csv(fname+'.csv'), dtype='int')
-                if subset:
-                    g = np.array([g[i] for i in subset],dtype='int')
+                if subset: g = np.array([g[i] for i in subset],dtype='int')
                 lower, upper = min(min(i, j) for i, j in g), max(max(i, j) for i, j in g)
                 # print("Lower and Upper index {}".format((lower,upper)))
                 size = upper - lower + 1
@@ -355,19 +353,21 @@ def load_data_features(fname, onlyseeds=False):
 # Produces the multiplied sum of
 def load_merged_graph_matrix(subset=None):
     preload = load_csv('Graph_Matrix_Merged.csv')
-    if preload is None or subset is None:
+    if preload is None or subset is not None:
         D = load_graph(shape_match=True, g_type='dist', subset=subset)
         G = load_graph(shape_match=True, g_type='adj', subset=subset)
-        assert D.shape == G.shape, '{} {}'.format(D.shape, G.shape)
+        print(G.shape)
+        if subset: assert D.shape == G.shape, '{} {}'.format(D.shape, G.shape)
         for i in range(G.shape[0]):
             for j in range(G.shape[1]):
-                D[i,j] *= G[i,j]
+                G[i,j] *= D[i,j]
         if subset is None:
             np.savetxt('Graph_Matrix_Merged.csv',  np.asarray(D), delimiter=",")
+            print('Saved Graph_Matrix_Merged.csv')
         else:
             print('Not saving Graph_Matrix_Merged.csv when composed from subset')
         print('New Graph is symmetric: {}'.format(check_symmetric(D)))
-        return D
+        return G
     else:
         return preload
 
