@@ -21,6 +21,9 @@ import rcca
 from matplotlib import offsetbox
 from time import time
 from sklearn import metrics
+from scipy.sparse import dia_matrix, csr_matrix
+from scipy.sparse.csgraph import dijkstra
+# https://docs.scipy.org/doc/scipy-0.18.1/reference/generated/scipy.sparse.csgraph.dijkstra.html#scipy.sparse.csgraph.dijkstra
 from sklearn.datasets import load_digits
 from sklearn.cluster import KMeans, DBSCAN, AgglomerativeClustering, Birch
 from sklearn.decomposition import PCA, KernelPCA, TruncatedSVD
@@ -29,57 +32,21 @@ from sklearn.manifold import SpectralEmbedding, TSNE
 from sklearn.cross_decomposition import CCA
 from csv_read import load_extracted_features, load_graph, load_seed, load_csv
 
-X = load_extracted_features(subset = range(6000))
-assert X.shape == (6000, 1084)
-matrix = load_graph(shape_match=True)
-seeds = load_seed()
 
-# This will make a matrix containing to all points from eachother via simularity
-def shortest_path(i, j, seen):
-    # computes shortest path from element i to j
-    point = (i,j)
-    if seen.get(str(point)):
-        return seen[str(point)]
-    elif (i == j):
-        seen[str((i,j))] = 0
-        return 0
-    elif matrix[i,j]:
-        return 1 # same point
-    else:
-        queue = []
-        # Initialize queue
-        for neighbor in matrix[i,:]:
-            if neighbor:
-                seen[str((i,neighbor))] = 1
-                queue.append((neighbor,j))
-
-        while queue and seen.get(str(point)) is None:
-            (n, j) = queue.pop()
-            if seen.get(str((n, j))):
-                seen[str(point)] = seen[str((i,n))] + seen[str((n,j))]
-            else:
-                for neighbor in matrix[n,:]:
-                    if neighbor and seen.get(str((n,neighbor))) is None:
-                        seen[str((n,neighbor))] = 1
-                        queue.append((neighbor,j))
-                        if seen.get(str((i,neighbor))) is None:
-                            seen[str((i,neighbor))] = seen[str((i,n))] + seen[str((n,neighbor))]
-
-        if seen.get(str(point)):
-            return seen[str(point)]
-        else:
-            return -1
-
-output = np.zeros(matrix.shape, dtype='int')
-table = {}
-for i in range(output.shape[0]):
-    for j in range(i, output.shape[1]):
-        p = shortest_path(i, j, table)
-        output[i,j] = output[j,i] = p
-        print('Got length for {}: {}'.format((i,j), p))
-        print('Current dictionary size: {}'.format(len(table)))
-
-np.savetxt('HopeThisWorks.csv', np.asarray(output), delimiter=",", fmt='%d')
+preload = load_csv('HopeThisWorks.csv')
+if preload is not None:
+    np.savetxt('Graph_Matrix_Edge_Distance.csv', np.asarray(preload), delimiter=",", fmt='%d')
+else:
+    X = load_extracted_features(subset = range(6000))
+    assert X.shape == (6000, 1084)
+    matrix = load_graph(shape_match=True)
+    seeds = load_seed()
+    output = dijkstra(csr_matrix(matrix), directed=False)
+    out_max = np.nanmax(output) + 1
+    print('Going to change NaN to {}'.format(out_max))
+    output[np.isnan(output)] = out_max
+    print('Done: output shape {}'.format(output.shape))
+    np.savetxt('Graph_Matrix_Edge_Distance.csv', np.asarray(output), delimiter=",", fmt='%d')
 
 
 
