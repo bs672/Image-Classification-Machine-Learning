@@ -144,7 +144,7 @@ def load_extracted_features_PCA(k=1084, onlyseeds=False):
     if preload is None:
         print('Running PCA on extracted_features{}'.format(k))
         X = StandardScaler(with_std=False).fit_transform(load_extracted_features())
-        preload = KernelPCA(n_components=k, kernel='rbf').fit_transform(X)
+        preload = KernelPCA(n_components=k, kernel='rbf', gamma=1.0, n_jobs=-1).fit_transform(X)
         np.savetxt(fname, np.asarray(preload), delimiter=",", fmt='%.5f')
         print('Saved ' + fname)
 
@@ -191,9 +191,9 @@ def load_spectral_embedding(k=5990, g_type='adj'):
             matrix = load_graph(shape_match=True,g_type=g_type)
             features, f_test = 1000, 500
             print('Running SpectralEmbedding for Graph_Matrix.csv with {} features'.format(features))
-            preload = SpectralEmbedding(n_components=features, affinity='precomputed').fit_transform(matrix)
+            preload = SpectralEmbedding(n_components=features, affinity='precomputed', n_jobs=-1).fit_transform(matrix)
             print('Also Running SpectralEmbedding with {} features for sanity check'.format(f_test))
-            p_test = SpectralEmbedding(n_components=f_test, affinity='precomputed').fit_transform(matrix)
+            p_test = SpectralEmbedding(n_components=f_test, affinity='precomputed', n_jobs=-1).fit_transform(matrix)
             np.savetxt(fname, np.asarray(preload), delimiter=",", fmt='%.4f')
             print('Saved ' + fname)
             print('Sanity Check: Eigen Vectors are the same even if computed with different features: {}'.format('Passed' if np.allclose(preload[:,:f_test], p_test) else 'Failed'))
@@ -204,9 +204,9 @@ def load_spectral_embedding(k=5990, g_type='adj'):
             matrix = load_graph(shape_match=True, g_type=g_type)
             features, f_test = 1000, 500
             print('Running SpectralEmbedding for Graph_Dist_Matrix.csv with {} features'.format(features))
-            preload = SpectralEmbedding(n_components=features, affinity='precomputed').fit_transform(matrix)
+            preload = SpectralEmbedding(n_components=features, affinity='precomputed', n_jobs=-1).fit_transform(matrix)
             print('Also Running SpectralEmbedding with {} features for sanity check'.format(f_test))
-            p_test = SpectralEmbedding(n_components=f_test, affinity='precomputed').fit_transform(matrix)
+            p_test = SpectralEmbedding(n_components=f_test, affinity='precomputed', n_jobs=-1).fit_transform(matrix)
             np.savetxt(fname, np.asarray(preload), delimiter=",", fmt='%.4f')
             # np.savetxt('SpectralEmbeddingDistTest.csv', np.asarray(p_test), delimiter=",", fmt='%.4f')
             print('Saved ' + fname)
@@ -218,9 +218,9 @@ def load_spectral_embedding(k=5990, g_type='adj'):
             matrix = load_merged_graph_matrix()
             features, f_test = 1000, 500
             print('Running SpectralEmbedding for Graph_Matrix_Merged.csv with {} features'.format(features))
-            preload = SpectralEmbedding(n_components=features, affinity='precomputed').fit_transform(matrix)
+            preload = SpectralEmbedding(n_components=features, affinity='precomputed', n_jobs=-1).fit_transform(matrix)
             print('Also Running SpectralEmbedding with {} features for sanity check'.format(f_test))
-            p_test = SpectralEmbedding(n_components=f_test, affinity='precomputed').fit_transform(matrix)
+            p_test = SpectralEmbedding(n_components=f_test, affinity='precomputed', n_jobs=-1).fit_transform(matrix)
             np.savetxt(fname, np.asarray(preload), delimiter=",", fmt='%.4f')
             # np.savetxt('SpectralEmbeddingMergedTest.csv', np.asarray(p_test), delimiter=",", fmt='%.4f')
             print('Saved ' + fname)
