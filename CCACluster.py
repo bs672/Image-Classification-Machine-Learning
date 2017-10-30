@@ -20,6 +20,7 @@ import rcca
 
 from matplotlib import offsetbox
 from time import time
+from scipy.stats.stats import pearsonr
 from sklearn import metrics
 from sklearn.datasets import load_digits
 from sklearn.cluster import KMeans
@@ -32,9 +33,9 @@ from csv_read import load_extracted_features_PCA, load_spectral_embedding, load_
 class CCACluster():
 
     # Only define k_CCA if you don't want to automatically determine the best value
-    def __init__(self, k_PCA, k_SE, k_CCA=None, best_reg=None, verbose=True, type='adj'):
+    def __init__(self, k_PCA, k_SE, k_CCA=None, best_reg=None, verbose=True, g_type='adj'):
         self.features = load_extracted_features_PCA(k=k_PCA)
-        self.graph = load_spectral_embedding(k=k_SE,type=type)
+        self.graph = load_spectral_embedding(k=k_SE,g_type=g_type)
         self.seeds = load_seed()
         self.cca_predictions = None
         self.fname = 'CCACluster_PCA{}_Spec{}.hdf5'.format(k_PCA, k_SE)
@@ -68,14 +69,14 @@ class CCACluster():
             return
 
         if CCrange:
-            ccaCV = rcca.CCACrossValidate(kernelcca = False,
+            ccaCV = rcca.CCACrossValidate(kernelcca = True,
                                 numCCs = CCrange,
-                                regs = [0, 1e2, 1e4, 1e6],
+                                regs = np.logspace(-4, -2, 0 2, 4, 6),
                                 verbose=self.verbose)
         else:
-            ccaCV = rcca.CCACrossValidate(kernelcca = False,
+            ccaCV = rcca.CCACrossValidate(kernelcca = True,
                                 numCCs = np.arange(1, min(self.k_PCA, self.k_SE)),
-                                regs = [0, 1e2, 1e4, 1e6],
+                                regs = np.logspace(-4, -2, 0 2, 4, 6),
                                 verbose=self.verbose)
 
         if self.features is None or self.graph is None:
@@ -96,6 +97,25 @@ class CCACluster():
         if not os.path.isfile(self.fname):
             ccaCV.save(self.fname)
         self.ccaCV = ccaCV
+
+    def filter(self, threshold=0.05):
+        if self.ccaCV is None:
+            if verbose: print('Going to compute best components first')
+            self.determine_CCA_components()
+
+        count = 0
+        l = []
+        len = test.ccaCV.comps[0].shape[0]
+        for i in range(len):
+            a = test.ccaCV.comps[0][i]
+            b = test.ccaCV.comps[1][i]
+            if abs(pearsonr(a,b)[0]) < threshold:
+                l.append(i)
+                count = count + 1
+        print('{} values were found to uncorrelated'.format(count))
+        return l
+
+
 
     def predict(self):
         if self.ccaCV is None:
