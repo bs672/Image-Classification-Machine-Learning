@@ -289,6 +289,22 @@ def load_spectral_embedding(k=5990, g_type='adj', subset=None):
             else:
                 print('Not saving {} because SpectralEmbedding was run on a subset'.format(fname))
             print('Sanity Check: Eigen Vectors are the same even if computed with different features: {}'.format('Passed' if np.allclose(preload[:,:f_test], p_test) else 'Failed'))
+    elif g_type == 'exp':
+        fname = 'SpectralEmbeddingEXP.csv'
+        preload = load_csv(fname)
+        if preload is None:
+            matrix = load_exp_graph_matrix(subset=subset)
+            print('Running SpectralEmbedding for Graph_Matrix_EXP.csv with {} features'.format(features))
+            preload = SpectralEmbedding(n_components=features, affinity='precomputed', n_jobs=-1).fit_transform(matrix)
+            print('Also Running SpectralEmbedding with {} features for sanity check'.format(f_test))
+            p_test = SpectralEmbedding(n_components=f_test, affinity='precomputed', n_jobs=-1).fit_transform(matrix)
+            if subset is None:
+                np.savetxt(fname, np.asarray(preload), delimiter=",", fmt='%.4f')
+                print('Saved ' + fname)
+            else:
+                print('Not saving {} because SpectralEmbedding was run on a subset'.format(fname))
+            print('Sanity Check: Eigen Vectors are the same even if computed with different features: {}'.format('Passed' if np.allclose(preload[:,:f_test], p_test) else 'Failed'))
+
 
     true_k = min(k, preload.shape[1])
     output = preload[:, :true_k] # Get the k first eigens of PCA output
@@ -386,11 +402,12 @@ def load_exp_graph_matrix(subset=None):
         print(G.shape)
 
         w, Q = LA.eigh(G)
-        V = np.diagflat(np.exp(w))
-        A = np.dot(np.dot(Q,V), Q.T)
+        # Scale w to reasonable range
+        V = np.diagflat(np.exp(w/200))
+        D = np.dot(np.dot(Q,V), Q.T)
 
         assert check_symmetric(V)
-        assert check_symmetric(A)
+        assert check_symmetric(D)
 
         if subset is None:
             np.savetxt('Graph_Matrix_EXP.csv',  np.asarray(D), delimiter=",")
