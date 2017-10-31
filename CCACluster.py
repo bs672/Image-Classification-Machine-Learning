@@ -5,8 +5,8 @@ import os
     Also allows you to read .csv from either inside DataSets or in the main folder
 """
 base = os.path.dirname(os.path.realpath(__file__))
-sys.path.append(os.path.join(base,'DataSets'))
-sys.path.append(os.path.join(base,'Modules'))
+sys.path.append(os.path.join(base, 'DataSets'))
+sys.path.append(os.path.join(base, 'Modules'))
 # print(sys.path)
 
 import pandas as pd
@@ -30,21 +30,24 @@ from sklearn.manifold import SpectralEmbedding, TSNE
 from sklearn.cross_decomposition import CCA
 from csv_read import load_extracted_features_PCA, load_spectral_embedding, load_seed, load_csv
 
+
 class CCACluster():
 
     # Only define k_CCA if you don't want to automatically determine the best value
     def __init__(self, k_PCA, k_SE, k_CCA=None, best_reg=None, verbose=True, g_type='adj'):
         self.features = load_extracted_features_PCA(k=k_PCA)
-        self.graph = load_spectral_embedding(k=k_SE,g_type=g_type)
+        self.graph = load_spectral_embedding(k=k_SE, g_type=g_type)
         self.seeds = load_seed()
         self.cca_predictions = None
         self.fname = 'CCACluster_PCA{}_Spec{}.hdf5'.format(k_PCA, k_SE)
-        if verbose: print('Loaded all data')
+        if verbose:
+            print('Loaded all data')
         self.ccaCV = None
         self.k_PCA, self.k_SE, self.k_CCA = k_PCA, k_SE, k_CCA
         self.best_reg = best_reg
         if os.path.isfile(self.fname):
-            if verbose: print('Found saved ccaCV')
+            if verbose:
+                print('Found saved ccaCV')
             self.ccaCV = rcca.CCACrossValidate()
             self.ccaCV.load(self.fname)
             # print(self.ccaCV.best_numCC)
@@ -62,22 +65,23 @@ class CCACluster():
             print('Using {} features from PCA reduced data'.format(k_PCA))
             print('Using {} features from Spectral Embedding of Graph.csv'.format(k_PCA))
 
-    def determine_CCA_components(self, CCrange = None):
+    def determine_CCA_components(self, CCrange=None):
         if self.ccaCV is not None:
             print('Cross Validation already computed')
             print('You should delete old saved .hdf5 if you wish to recompute')
             return
 
         if CCrange:
-            ccaCV = rcca.CCACrossValidate(kernelcca = True,
-                                numCCs = CCrange,
-                                regs = np.logspace(-4, -2, 0 2, 4, 6),
-                                verbose=self.verbose)
+            ccaCV = rcca.CCACrossValidate(kernelcca=True,
+                                          numCCs=CCrange,
+                                          regs=np.logspace(-4, -2, 0, 2, 4, 6),
+                                          verbose=self.verbose)
         else:
-            ccaCV = rcca.CCACrossValidate(kernelcca = True,
-                                numCCs = np.arange(1, min(self.k_PCA, self.k_SE)),
-                                regs = np.logspace(-4, -2, 0 2, 4, 6),
-                                verbose=self.verbose)
+            ccaCV = rcca.CCACrossValidate(kernelcca=True,
+                                          numCCs=np.arange(
+                                              1, min(self.k_PCA, self.k_SE)),
+                                          regs=np.logspace(-4, -2, 0, 2, 4, 6),
+                                          verbose=self.verbose)
 
         if self.features is None or self.graph is None:
             print('What the fuck is this?')
@@ -86,7 +90,8 @@ class CCACluster():
         if self.verbose:
             print('Best CCA components: {}'.format(self.k_CCA))
             print('Best Regularization: {}'.format(self.best_reg))
-        testcorrsCV = ccaCV.validate([self.features[5000:6000], self.graph[5000:]])
+        testcorrsCV = ccaCV.validate(
+            [self.features[5000:6000], self.graph[5000:]])
         if self.verbose:
             print('Test correlations')
             print(testcorrsCV)
@@ -100,7 +105,8 @@ class CCACluster():
 
     def filter(self, threshold=0.05):
         if self.ccaCV is None:
-            if verbose: print('Going to compute best components first')
+            if verbose:
+                print('Going to compute best components first')
             self.determine_CCA_components()
 
         count = 0
@@ -109,7 +115,7 @@ class CCACluster():
         for i in range(len):
             a = self.ccaCV.comps[0][i]
             b = self.ccaCV.comps[1][i]
-            if abs(pearsonr(a,b)[0]) < threshold:
+            if abs(pearsonr(a, b)[0]) < threshold:
                 l.append(i)
                 count = count + 1
         print('{} values were found to uncorrelated'.format(count))
@@ -117,7 +123,8 @@ class CCACluster():
 
     def predict(self):
         if self.ccaCV is None:
-            if verbose: print('Going to compute best components first')
+            if verbose:
+                print('Going to compute best components first')
             self.determine_CCA_components()
 
         # self.cca_predictions, _ = self.ccaCV.predict(self.features, self.ccaCV.ws)
@@ -132,10 +139,10 @@ class CCACluster():
             if from_save:
                 self.cca_predictions = load_csv(from_save)
 
-            if self.cca_predictions is None: #still none
+            if self.cca_predictions is None:  # still none
                 self.predict()
 
-        kmeans = KMeans(n_clusters = 10).fit(self.cca_predictions)
+        kmeans = KMeans(n_clusters=10).fit(self.cca_predictions)
         count = 0.0
         for i, label in self.seeds:
             count += int(label == kmeans.labels_[i])
@@ -143,19 +150,20 @@ class CCACluster():
             if not(label == kmeans.labels_[i]):
                 print('Seed {} is mislabeled'.format(i))
                 print('{} should be {}'.format(kmeans.labels_[i], label))
-        print('Correctness : {} '.format( count/60. ))
-
+        print('Correctness : {} '.format(count / 60.))
 
     def save_predictions(self):
         if self.cca_predictions is None:
             self.predict()
 
-        np.savetxt('CCAPred-{}-{}-{}.csv'.format(self.k_CCA, self.k_PCA, self.k_SE), np.asarray(self.cca_predictions), delimiter=",", fmt='%.5f')
+        np.savetxt('CCAPred-{}-{}-{}.csv'.format(self.k_CCA, self.k_PCA, self.k_SE),
+                   np.asarray(self.cca_predictions), delimiter=",", fmt='%.5f')
         if self.verbose:
             print('Saved predictions')
 
+
 if __name__ == '__main__':
-    test = CCACluster(k_PCA = 100, k_SE = 100)
+    test = CCACluster(k_PCA=100, k_SE=100)
     test.determine_CCA_components()
     print('How many recommended components : {}'.format(test.k_CCA))
     test.predict()
