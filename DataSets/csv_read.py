@@ -1,4 +1,5 @@
 import numpy as np
+import numpy.linalg as LA
 import os
 import pandas as pd
 from sklearn.preprocessing import StandardScaler
@@ -377,7 +378,29 @@ def load_merged_graph_matrix(subset=None):
     else:
         return preload
 
+# Produces the exponentiated adjacency matrix
+def load_exp_graph_matrix(subset=None):
+    preload = load_csv('Graph_Matrix_EXP.csv')
+    if preload is None or subset is not None:
+        G = load_graph(shape_match=True, g_type='adj', subset=subset)
+        print(G.shape)
 
+        w, Q = LA.eigh(G)
+        V = np.diagflat(np.exp(w))
+        A = np.dot(np.dot(Q,V), Q.T)
+
+        assert check_symmetric(V)
+        assert check_symmetric(A)
+
+        if subset is None:
+            np.savetxt('Graph_Matrix_EXP.csv',  np.asarray(D), delimiter=",")
+            print('Saved Graph_Matrix_EXP.csv')
+        else:
+            print('Not saving Graph_Matrix_EXP.csv when composed from subset')
+        print('New Graph is symmetric: {}'.format(check_symmetric(D)))
+        return G
+    else:
+        return preload
 
 
 if __name__ == '__main__':
