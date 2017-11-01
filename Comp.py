@@ -45,9 +45,9 @@ class CCACluster():
         assert self.features.shape == (10000, k_PCA)
         assert self.graph.shape == (6000, k_SE)
         assert self.seeds.shape == (60, 2)
-        if verbose:
-            print('Using {} features from Spectral Embedding of Graph_Dist.csv'.format(k_PCA))
-            print('Using {} features from Spectral Embedding of Graph.csv'.format(k_PCA))
+        # if verbose:
+        #     print('Using {} features from Spectral Embedding of Graph_Dist.csv'.format(k_PCA))
+        #     print('Using {} features from Spectral Embedding of Graph.csv'.format(k_PCA))
 
     def determine_CCA_components(self, CCrange = None):
         if self.ccaCV is not None:

@@ -36,19 +36,21 @@ def seed_matrix(s):
 
 class SiameseModel():
 
-    def __init__(self, data, seeds, name, batch_size = 256):
+    def __init__(self, data, seeds, name, dense=False, batch_size = 256):
         # input dimensions (size of input, eg 10)
         # data: all featurs
         # seed: index and labels of seed
         # name, from which the model is saved to
         self.input_shape = (1, data.shape[1])
-        self.X = data # features of ALL values
+        self.X = data # features of seeds
         self.X_seeds = features_of_seeds(seeds, data) # gets the seed features
         self.seeds = seeds
         self.s_matrix = seed_matrix(seeds)
         self.fname = os.path.join('Modules', (name + '.hdf5'))
         self.label_name = name + '.csv  '
         self.batch_size = batch_size
+        self.dense = dense # Do we use the combinations for the model?
+
 
         self.model = None
 
@@ -58,7 +60,7 @@ class SiameseModel():
 
         # Internal model is a softmax 10-class classifier
         internalmodel = Sequential()
-        internalmodel.add(GaussianNoise(0.01, input_shape=self.input_shape))
+        internalmodel.add(GaussianNoise(0.0001, input_shape=self.input_shape))
         internalmodel.add(Flatten())
         internalmodel.add(Dense(64, activation='relu'))
         internalmodel.add(Dropout(0.5))
@@ -73,14 +75,14 @@ class SiameseModel():
 
         encoded_l, encoded_r = internalmodel(left_input), internalmodel(right_input)
         #merge two encoded inputs with the l1 distance between them
-        L1_distance = lambda x: K.abs(x[0]-x[1])
+        L1_distance = lambda x: K.abs(x[0] - x[1])
         subtracted = subtract([encoded_l,encoded_r])
         both = Lambda(lambda x: K.abs(x))(subtracted)
         prediction = Dense(1,activation='sigmoid')(both)
         siamese_net = Model(inputs=[left_input,right_input], outputs=prediction)
         # TODO, compare to ADAM
         siamese_net.compile(loss='binary_crossentropy',
-                            optimizer=Adam(lr=0.001),
+                            optimizer='rmsprop',
                             metrics=['accuracy'])
 
         if from_save and os.path.isfile(self.fname):
@@ -106,7 +108,7 @@ class SiameseModel():
         print('\nSanity Check : {}'.format('Passed' if self.siamese_sanity_check() == 1.0 else 'Failed'))
 
         print('Performing sanity check: ([y,x]) => ([x,y])')
-        print('\nSanity Check : {}'.format('Passed' if self.symmetry_sanity_check() == 1.0 else 'Failed'))
+        print('Sanity Check : {}'.format('Passed' if self.symmetry_sanity_check() == 1.0 else 'Failed'))
 
     # Runs predictions on similarity to seeds for the data
     def predict(self, split=False, via_max=True, verbose=True, save=True):

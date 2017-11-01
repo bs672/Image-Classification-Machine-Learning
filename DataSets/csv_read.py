@@ -201,11 +201,9 @@ def load_extracted_features_PCA(k=1084, onlyseeds=False, subset=None):
         X = StandardScaler(with_std=False).fit_transform(load_extracted_features(subset=subset))
         pca = PCA(n_components=k)
         preload = pca.fit_transform(X)
-        print(pca.explained_variance_)
-        for i, lamb in enumerate(pca.explained_variance_):
-            preload[:,i] *= lamb
+        print('Explained Variance {}'.format(pca.explained_variance_))
         if subset is None:
-            np.savetxt(fname, np.asarray(preload), delimiter=",", fmt='%.5f')
+            np.savetxt(fname, np.asarray(preload), delimiter=",")
             print('Saved ' + fname)
         else:
             print('Not saving {} because PCA was run on a subset of extracted features'.format(fname))
