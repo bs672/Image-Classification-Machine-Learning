@@ -410,7 +410,7 @@ def load_exp_graph_matrix(subset=None):
         assert check_symmetric(D)
 
         if subset is None:
-            np.savetxt('Graph_Matrix_EXP.csv',  np.asarray(D), delimiter=",")
+            np.savetxt('Graph_Matrix_EXP.csv',  np.asarray(D), delimiter=",", fmt='%.5f')
             print('Saved Graph_Matrix_EXP.csv')
         else:
             print('Not saving Graph_Matrix_EXP.csv when composed from subset')
