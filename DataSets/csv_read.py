@@ -94,40 +94,55 @@ def load_csv(fname):
 def check_symmetric(a, tol=1e-8):
     return np.allclose(a, a.T, atol=tol)
 
+def compute_dist(metric, X, subset):
+    size = len(subset) if subset else X.shape[0]
+    output = np.zeros((size,size))
+    if subset:
+        for i, index_i in enumerate(subset):
+            for j, index_j in enumerate(subset):
+                output[i,j] = metric(X[index_i],X[index_j])
+    else:
+        for i in range(size):
+            for j in range(size):
+                output[i,j] = metric(X[i],X[j])
+    return output
+
+
 # For subset, I'm assuming only one iterable. If you want a pair of iterables to
 # loop through the matrix output, please let me know @Diyv
-def load_graph(fname='Graph', shape_match=False, g_type='adj', subset=None):
+def load_graph(fname='Graph', shape_match=False, g_type='adj', dist_type='euc', subset=None):
     if shape_match:
         if g_type == 'dist':
             fname = fname + '_Dist'
-        preload = load_csv(fname+'_Matrix.csv')
+            preload = load_csv(fname+'_Matrix_'+dist_type+'.csv')
+        else:
+            preload = load_csv(fname+'_Matrix.csv')
         if preload is not None:
             return preload
         else:
+            X = load_extracted_features_PCA(k=30)
             if g_type == 'dist':
-                def A(x1,x2):
-                    return np.exp(-(np.linalg.norm(x1-x2)**2))
-                def B(x1,x2):
-                    return np.linalg.norm(x1-x2)
-                # Creates a distance matrix, ala lecture notes
-                X = load_extracted_features_PCA(k=30)
-                size = len(subset) if subset else X.shape[0]
-                output = np.zeros((size,size))
-                outputB = np.zeros((size,size))
-                if subset:
-                    for i, index_i in enumerate(subset):
-                        for j, index_j in enumerate(subset):
-                            output[i,j] = A(X[index_i],X[index_j])
-                            outputB[i,j] = B(X[index_i],X[index_j])
-                    print('Not saving Distance matrix because it is a subset')
+                if dist_type == 'euc':
+                    def euclidian(x1,x2):
+                        return np.linalg.norm(x1-x2)
+                    output = compute_dist(euclidian, X, subset)
+                    if subset:
+                        print('Not saving Distance matrix because it is a subset')
+                    else:
+                        print("Saving new distance values as a matrix: {}_Matrix_{}.csv".format(fname, dist_type))
+                        np.savetxt(fname+'_Matrix_'+dist_type+'.csv',  np.asarray(output), delimiter=",", fmt='%.4f')
+                elif dist_type == 'gauss':
+                    def gaussian(x1,x2):
+                        return np.exp(-(np.linalg.norm(x1-x2)**2))
+                    output = compute_dist(gaussian, X, subset)
+                    if subset:
+                        print('Not saving Distance matrix because it is a subset')
+                    else:
+                        print("Saving new distance values as a matrix: {}_Matrix_{}.csv".format(fname, dist_type))
+                        np.savetxt(fname+'_Matrix_'+dist_type+'.csv',  np.asarray(output), delimiter=",", fmt='%.4f')
                 else:
-                    for i in range(size):
-                        for j in range(size):
-                            output[i,j] = A(X[index_i],X[index_j])
-                            outputB[i,j] = B(X[index_i],X[index_j])
-                    print("Saving new distance values as a matrix: {}_Matrix.csv".format(fname))
-                    np.savetxt(fname+'_Matrix.csv',  np.asarray(output), delimiter=",")
-                    np.savetxt(fname+'_Matrix_B.csv',  np.asarray(outputB), delimiter=",")
+                    print('Invalid g_type for distance matrix calculation')
+            # Adjacency Matrix
             else:
                 g = np.array(load_csv(fname+'.csv'), dtype='int')
                 if subset: g = np.array([g[i] for i in subset],dtype='int')
@@ -244,7 +259,7 @@ def load_seed_matrix(fname='Seed_Matrix'):
         print('Saved ' + fname+'.csv')
         return output
 
-def load_spectral_embedding(k=5990, g_type='adj', subset=None):
+def load_spectral_embedding(k=5990, g_type='adj', dist_type='euc', subset=None):
     features, f_test = 1000, 500 # Change these defaults at leisure
     if g_type == 'adj':
         fname = 'SpectralEmbedding.csv'
@@ -262,10 +277,10 @@ def load_spectral_embedding(k=5990, g_type='adj', subset=None):
                 print('Not saving {} because SpectralEmbedding was run on a subset'.format(fname))
             print('Sanity Check: Eigen Vectors are the same even if computed with different features: {}'.format('Passed' if np.allclose(preload[:,:f_test], p_test) else 'Failed'))
     elif g_type == 'dist':
-        fname = 'SpectralEmbeddingDist.csv'
+        fname = 'SpectralEmbeddingDist_{}.csv'.format(dist_type)
         preload = load_csv(fname)
         if preload is None:
-            matrix = load_graph(shape_match=True, g_type=g_type, subset=subset)
+            matrix = load_graph(shape_match=True, g_type=g_type, dist_type=dist_type, subset=subset)
             print('Running SpectralEmbedding for Graph_Dist_Matrix.csv with {} features'.format(features))
             preload = SpectralEmbedding(n_components=features, affinity='precomputed', n_jobs=-1).fit_transform(matrix)
             print('Also Running SpectralEmbedding with {} features for sanity check'.format(f_test))
@@ -446,4 +461,5 @@ if __name__ == '__main__':
     print("Running Unit Tests (This will take a while): ...")
     # load_merged_graph_matrix()
     # unittests()
-    load_spectral_embedding(k=1000, g_type='exp')
+    load_spectral_embedding(k=1000, g_type='exp', dist_type='euc')
+    load_graph(shape_match=True, g_type='dist', dist_type='euc')
