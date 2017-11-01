@@ -30,92 +30,57 @@ from sklearn.decomposition import PCA, KernelPCA, TruncatedSVD
 from sklearn.preprocessing import StandardScaler, scale
 from sklearn.manifold import SpectralEmbedding, TSNE
 from sklearn.cross_decomposition import CCA
-from csv_read import load_extracted_features, load_graph, load_seed, load_csv
+from csv_read import load_extracted_features_PCA, load_graph, load_seed, load_csv, load_extracted_features
 from Comp import CCACluster
+from models import SiameseModel, Classifier
 
-e_Dist = load_csv('Graph_Matrix_Edge_Distance.csv')
-f_Dist = load_graph(shape_match=True, g_type='dist')
 
-# Running with no preembedding
-# Fails bad
-# ccacluster = CCACluster(f_Dist[:,:6000], e_Dist, k_PCA = 6000, k_SE=6000)
-# cca = CCA(n_components=8)
-# cca.fit(f_Dist[:6000], e_Dist[:6000])
-# ccacluster.cca_predictions = cca.transform(f_Dist[6000:])
+# Sanity
+best = load_csv('AllLabelsCCAGraphPred-8-500-500viaMax.csv') # 58.5
+
+features = load_csv('Graph_Matrix_Path_Distance.csv')
+features = SpectralEmbedding(n_components=100, affinity='precomputed', n_jobs=-1).fit_transform(features)
+# assert features is not None
+test = SiameseModel(features, load_seed(), "PathDistance", batch_size = 256)
+test.create_model()
+test.fit()
+test.evaluate()
+labels = test.predict()
+
+classifier_features = load_extracted_features_PCA(k=10)
+if labels.shape == (10000,2):
+    print('Reducing labels')
+    labels = labels[:6000]
+test2 = Classifier(classifier_features, labels, "PathDistanceClassifier", batch_size = 256)
+test2.fit()
+output = test2.predict()
+
+sim = 0
+for i in range(output.shape[0]):
+    assert (best[i][0] == output[i][0])
+    sim += int(best[i][1] == output[i][1])
+
+print(sim/output.shape[0]))
+
+
+# e_Dist = load_csv('Graph_Matrix_Edge_Distance.csv')
+# f_Dist = load_graph(shape_match=True, g_type='dist')
+#
+# # Running with no preembedding
+# # Fails bad
+# # ccacluster = CCACluster(f_Dist[:,:6000], e_Dist, k_PCA = 6000, k_SE=6000)
+# # cca = CCA(n_components=8)
+# # cca.fit(f_Dist[:6000], e_Dist[:6000])
+# # ccacluster.cca_predictions = cca.transform(f_Dist[6000:])
+# # ccacluster.save_predictions()
+#
+# e_Dist_spec = SpectralEmbedding(n_components=100, affinity='precomputed', n_jobs=-1).fit_transform(e_Dist)
+# f_Dist_spec = SpectralEmbedding(n_components=100, affinity='precomputed', n_jobs=-1).fit_transform(f_Dist)
+# # print(f_Dist_spec.shape)
+# ccacluster = CCACluster(f_Dist_spec, e_Dist_spec, k_PCA = 100, k_SE=100)
+# # ccacluster.save_predictions()
+#
+# print('Now with 10 components')
+# ccacluster.k_CCA = 10
+# ccacluster.cca_predictions = None
 # ccacluster.save_predictions()
-
-e_Dist_spec = SpectralEmbedding(n_components=100, affinity='precomputed', n_jobs=-1).fit_transform(e_Dist)
-f_Dist_spec = SpectralEmbedding(n_components=100, affinity='precomputed', n_jobs=-1).fit_transform(f_Dist)
-# print(f_Dist_spec.shape)
-ccacluster = CCACluster(f_Dist_spec, e_Dist_spec, k_PCA = 100, k_SE=100)
-# ccacluster.save_predictions()
-
-print('Now with 10 components')
-ccacluster.k_CCA = 10
-ccacluster.cca_predictions = None
-ccacluster.save_predictions()
-# if preload is not None:
-#     np.savetxt('Graph_Matrix_Edge_Distance.csv', np.asarray(preload), delimiter=",", fmt='%d')
-# else:
-#     X = load_extracted_features(subset = range(6000))
-#     assert X.shape == (6000, 1084)
-#     matrix = load_graph(shape_match=True)
-#     seeds = load_seed()
-#     output = dijkstra(csr_matrix(matrix), directed=False)
-#     out_max = np.nanmax(output) + 1
-#     print('Going to change NaN to {}'.format(out_max))
-#     output[np.isnan(output)] = out_max
-#     print('Done: output shape {}'.format(output.shape))
-#     np.savetxt('Graph_Matrix_Edge_Distance.csv', np.asarray(output), delimiter=",", fmt='%d')
-
-
-
-
-
-
-
-# Spec_comp = 2
-# correctness = np.zeros(8)
-# for n_comp in range(2,10):
-#
-#     X_pca = load_csv('X_pca_{}.csv'.format(n_comp))
-#     if X_pca is None:
-#         X_pca = PCA(n_components=n_comp).fit_transform(X)
-#         np.savetxt('DataSets/X_pca_{}.csv'.format(n_comp),np.asarray(X_pca), delimiter=",")
-#     M_spec = load_csv('MSpec_{}.csv'.format(Spec_comp))
-#     if M_spec is None:
-#         M_spec = SpectralEmbedding(n_comp=Spec_comp).fit_transform(matrix)
-#         np.savetxt('DataSets/MSpec_{}.csv'.format(Spec_comp),np.asarray(M_spec), delimiter=",")
-#     cca = CCA(n_components=n_comp)
-#     X_cca, M_cca = cca.fit_transform(X_pca[:6000], M_spec)
-#     # np.savetxt('DataSets/X_cca_{}.csv'.format(n_comp),np.asarray(X_cca), delimiter=",")
-#     # np.savetxt('DataSets/M_cca_{}.csv'.format(Spec_comp),np.asarray(M_cca), delimiter=",")
-#     X_pred_cca = cca.predict(X_pca[6000:])
-#     # np.savetxt('DataSets/X_pred_cca_{}.csv'.format(n_comp),np.asarray(X_pred_cca), delimiter=",")
-#
-#     centroids = np.zeros((10,n_comp))
-#     for i, label in seeds:
-#         centroids[label] += X_cca[i]
-#     centroids /= 10
-#
-#     kmeans = KMeans(n_clusters = 10, init=centroids).fit(X_cca)
-#
-#     print('For N_Comp {} and Spec_comp {}'.format(n_comp, Spec_comp))
-#     count = 0.0
-#     for i, label in seeds:
-#         count += int(label == kmeans.labels_[i])
-#         correctness[n_comp-2] += int(label == kmeans.labels_[i])
-#         if not(label == kmeans.labels_[i]):
-#             print('Seed {} is mislabeled'.format(i))
-#             print('{} should be {}'.format(kmeans.labels_[i], label))
-#     print('Correctness : {} '.format( count/60. ))
-#
-#     # scores = np.zeros(10)
-#     # for i, label in seeds:
-#     #     scores[label] += np.linalg.norm(centroids[label] - X_cca[i])
-#     #
-#     # print('For N_Comp {}'.format(n_comp))
-#     # print('Range {} - {}'.format(np.min(scores),np.max(scores)))
-#     # for i, s in enumerate(scores):
-#     #     print('Score for label {}, {}'.format(i,s))
-# print(correctness/60.)

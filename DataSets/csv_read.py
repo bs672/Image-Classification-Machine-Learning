@@ -83,7 +83,7 @@ def load_csv(fname):
     if os.path.isfile(fname):
         return pd.read_csv(fname, delimiter=',', header=None).values
     elif os.path.isfile(os.path.join('DataSets',fname)):
-        return pd.read_csv(os.path.join('DataSets',fname), delimiter=',',header=None).values
+        return pd.read_csv(os.path.join('DataSets',fname), delimiter=',', header=None).values
     else:
         print('{} not in DataSets folder.'.format(fname))
         return None
@@ -198,7 +198,11 @@ def load_extracted_features_PCA(k=1084, onlyseeds=False, subset=None):
     if preload is None or subset is not None:
         print('Running PCA on extracted_features{}'.format(k))
         X = StandardScaler(with_std=False).fit_transform(load_extracted_features(subset=subset))
-        preload = KernelPCA(n_components=k, kernel='rbf', gamma=1.0, n_jobs=-1).fit_transform(X)
+        pca = PCA(n_components=k)
+        preload = pca.fit_transform(X)
+        print(pca.explained_variance_)
+        for i, lamb in enumerate(pca.explained_variance_):
+            preload[:,i] *= lamb
         if subset is None:
             np.savetxt(fname, np.asarray(preload), delimiter=",", fmt='%.5f')
             print('Saved ' + fname)
@@ -403,4 +407,5 @@ if __name__ == '__main__':
     print("                                            such that M[i,j] = D[i,j] * G[i,j]")
     print("Running Unit Tests (This will take a while): ...")
     # load_merged_graph_matrix()
-    unittests()
+    # unittests()
+    load_spectral_embedding(k=1000, g_type='exp')
