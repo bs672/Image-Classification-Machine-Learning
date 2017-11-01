@@ -1,4 +1,5 @@
 import numpy as np
+import numpy.linalg as LA
 import os
 import pandas as pd
 from sklearn.preprocessing import StandardScaler
@@ -292,6 +293,22 @@ def load_spectral_embedding(k=5990, g_type='adj', subset=None):
             else:
                 print('Not saving {} because SpectralEmbedding was run on a subset'.format(fname))
             print('Sanity Check: Eigen Vectors are the same even if computed with different features: {}'.format('Passed' if np.allclose(preload[:,:f_test], p_test) else 'Failed'))
+    elif g_type == 'exp':
+        fname = 'SpectralEmbeddingEXP.csv'
+        preload = load_csv(fname)
+        if preload is None:
+            matrix = load_exp_graph_matrix(subset=subset)
+            print('Running SpectralEmbedding for Graph_Matrix_EXP.csv with {} features'.format(features))
+            preload = SpectralEmbedding(n_components=features, affinity='precomputed', n_jobs=-1).fit_transform(matrix)
+            print('Also Running SpectralEmbedding with {} features for sanity check'.format(f_test))
+            p_test = SpectralEmbedding(n_components=f_test, affinity='precomputed', n_jobs=-1).fit_transform(matrix)
+            if subset is None:
+                np.savetxt(fname, np.asarray(preload), delimiter=",", fmt='%.4f')
+                print('Saved ' + fname)
+            else:
+                print('Not saving {} because SpectralEmbedding was run on a subset'.format(fname))
+            print('Sanity Check: Eigen Vectors are the same even if computed with different features: {}'.format('Passed' if np.allclose(preload[:,:f_test], p_test) else 'Failed'))
+
 
     true_k = min(k, preload.shape[1])
     output = preload[:, :true_k] # Get the k first eigens of PCA output
@@ -381,7 +398,30 @@ def load_merged_graph_matrix(subset=None):
     else:
         return preload
 
+# Produces the exponentiated adjacency matrix
+def load_exp_graph_matrix(subset=None):
+    preload = load_csv('Graph_Matrix_EXP.csv')
+    if preload is None or subset is not None:
+        G = load_graph(shape_match=True, g_type='adj', subset=subset)
+        print(G.shape)
 
+        w, Q = LA.eigh(G)
+        # Scale w to reasonable range
+        V = np.diagflat(np.exp(w/200))
+        D = np.dot(np.dot(Q,V), Q.T)
+
+        assert check_symmetric(V)
+        assert check_symmetric(D)
+
+        if subset is None:
+            np.savetxt('Graph_Matrix_EXP.csv',  np.asarray(D), delimiter=",")
+            print('Saved Graph_Matrix_EXP.csv')
+        else:
+            print('Not saving Graph_Matrix_EXP.csv when composed from subset')
+        print('New Graph is symmetric: {}'.format(check_symmetric(D)))
+        return G
+    else:
+        return preload
 
 
 if __name__ == '__main__':
