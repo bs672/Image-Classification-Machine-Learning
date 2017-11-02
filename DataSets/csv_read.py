@@ -260,7 +260,7 @@ def load_seed_matrix(fname='Seed_Matrix'):
         return output
 
 def load_spectral_embedding(k=5990, g_type='adj', dist_type='euc', subset=None):
-    features, f_test = 1000, 500 # Change these defaults at leisure
+    features, f_test = 1000, 50 # Change these defaults at leisure
     if g_type == 'adj':
         fname = 'SpectralEmbedding.csv'
         preload = load_csv(fname)
@@ -281,7 +281,7 @@ def load_spectral_embedding(k=5990, g_type='adj', dist_type='euc', subset=None):
         preload = load_csv(fname)
         if preload is None:
             matrix = load_graph(shape_match=True, g_type=g_type, dist_type=dist_type, subset=subset)
-            print('Running SpectralEmbedding for Graph_Dist_Matrix.csv with {} features'.format(features))
+            print('Running SpectralEmbedding for Graph_Dist_Matrix_{}.csv with {} features'.format(dist_type, features))
             preload = SpectralEmbedding(n_components=features, affinity='precomputed', n_jobs=-1).fit_transform(matrix)
             print('Also Running SpectralEmbedding with {} features for sanity check'.format(f_test))
             p_test = SpectralEmbedding(n_components=f_test, affinity='precomputed', n_jobs=-1).fit_transform(matrix)
