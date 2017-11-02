@@ -32,7 +32,7 @@ from csv_read import load_extracted_features_PCA, load_spectral_embedding, load_
 class CCACluster():
 
     # Only define k_CCA if you don't want to automatically determine the best value
-    def __init__(self, X, Y, k_PCA, k_SE, k_CCA=None, best_reg=None, verbose=True):
+    def __init__(self, X, Y, k_PCA, k_SE, k_CCA=None, best_reg=None, verbose=True, fname=None):
         self.features = X
         self.graph = Y
         self.seeds = load_seed()
@@ -42,7 +42,8 @@ class CCACluster():
         self.k_PCA, self.k_SE, self.k_CCA = k_PCA, k_SE, k_CCA
         self.best_reg = best_reg
         self.verbose = verbose
-        assert self.features.shape == (10000, k_PCA)
+        self.fname=fname
+        # assert self.features.shape == (10000, k_PCA)
         assert self.graph.shape == (6000, k_SE)
         assert self.seeds.shape == (60, 2)
         # if verbose:
@@ -54,32 +55,30 @@ class CCACluster():
             print('Cross Validation already computed')
             return
 
-        if CCrange:
+        if CCrange is not None:
             ccaCV = rcca.CCACrossValidate(kernelcca = False,
                                 numCCs = CCrange,
                                 regs = [0],
-                                verbose=self.verbose)
+                                verbose=False)
         else:
             ccaCV = rcca.CCACrossValidate(kernelcca = False,
                                 numCCs = np.arange(1, min(self.k_PCA, self.k_SE)),
                                 regs = [0],
-                                verbose=self.verbose)
+                                verbose=1)
 
-        if self.features is None or self.graph is None:
-            print('What the fuck is this?')
         ccaCV.train([self.features[:6000], self.graph])
         self.k_CCA, self.best_reg = ccaCV.best_numCC, ccaCV.best_reg
         if self.verbose:
             print('Best CCA components: {}'.format(self.k_CCA))
-            print('Best Regularization: {}'.format(self.best_reg))
+            # print('Best Regularization: {}'.format(self.best_reg))
         testcorrsCV = ccaCV.validate([self.features[:6000], self.graph])
         if self.verbose:
             print('Test correlations')
-            print(testcorrsCV)
+            # print(testcorrsCV)
         ccaCV.compute_ev([self.features[:6000], self.graph])
         if self.verbose:
             print('Expected Variance has been computed')
-            print(ccaCV.ev)
+            # print(ccaCV.ev)
         self.ccaCV = ccaCV
 
     def predict(self):
@@ -117,8 +116,10 @@ class CCACluster():
     def save_predictions(self):
         if self.cca_predictions is None:
             self.predict()
-
-        np.savetxt('CCAGraphPred-{}-{}-{}.csv'.format(self.k_CCA, self.k_PCA, self.k_SE), np.asarray(self.cca_predictions), delimiter=",", fmt='%.4f')
+        if self.fname:
+            np.savetxt(self.fname + '.csv', np.asarray(self.cca_predictions), delimiter=",", fmt='%.4f')
+        else:
+            np.savetxt('CCAGraphPred-{}-{}-{}.csv'.format(self.k_CCA, self.k_PCA, self.k_SE), np.asarray(self.cca_predictions), delimiter=",", fmt='%.4f')
         if self.verbose:
             print('Saved predictions')
 

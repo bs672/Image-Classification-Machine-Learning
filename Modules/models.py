@@ -7,6 +7,7 @@ import sys
 import os
 import numpy as np
 from itertools import combinations
+from math import factorial
 from keras.layers import Input, Conv2D, Lambda, subtract, Dense, Flatten, Dropout, GaussianNoise
 from keras.models import Model, Sequential
 from keras import backend as K
@@ -74,8 +75,6 @@ class SiameseModel():
                       metrics=['accuracy'])
 
         encoded_l, encoded_r = internalmodel(left_input), internalmodel(right_input)
-        #merge two encoded inputs with the l1 distance between them
-        L1_distance = lambda x: K.abs(x[0] - x[1])
         subtracted = subtract([encoded_l,encoded_r])
         both = Lambda(lambda x: K.abs(x))(subtracted)
         prediction = Dense(1,activation='sigmoid')(both)
@@ -131,7 +130,7 @@ class SiameseModel():
                 labels[batch] = np.array([batch+1, self.seeds[np.argmax(pred)][1]], dtype='int')
             else: #via sum
                 similarity_sums = np.zeros(10)
-                for j in range(s):
+                for j in range(self.X_seeds.shape[0]):
                     similarity_sums[self.seeds[j][1]] += pred[j][0]
                 labels[batch] = np.array([batch+1, np.argmax(similarity_sums)], dtype='int')
         if verbose: print('Performing sanity check: Perfect Seed Labeling')
@@ -148,14 +147,14 @@ class SiameseModel():
             if verbose: print('Returning all labels and the last 4000')
             if save:
                 print('Also saving them')
-                np.savetxt('All{}'.format(self.label_name), np.asarray(labels), delimiter=',', fmt='%d')
-                np.savetxt('Results{}'.format(self.label_name), np.asarray(labels[6000:]), delimiter=',', fmt='%d')
+                np.savetxt('Allvia{}-{}'.format('Max' if via_max else 'Sum',self.label_name), np.asarray(labels), delimiter=',', fmt='%d')
+                np.savetxt('Resultsvia{}-{}'.format('Max' if via_max else 'Sum',self.label_name), np.asarray(labels[6000:]), delimiter=',', fmt='%d')
             return labels, labels[6000:]
         else:
             if verbose: print('Returning {} labels'.format(labels.shape[0]))
             if save:
                 print('Also saving them')
-                np.savetxt('{}'.format(self.label_name), np.asarray(labels), delimiter=',', fmt='%d')
+                np.savetxt('via{}-{}'.format('Max' if via_max else 'Sum',self.label_name), np.asarray(labels), delimiter=',', fmt='%d')
             return labels
 
     def training_generator(self):
@@ -209,21 +208,20 @@ class SiameseModel():
     # runs predictions are pairs of two, and then the reverse pair, trying to get
     # the same result
     # same result given the [y,x] == [x,y] property
-    # TODO, change so all predictions are done at once
-    def symmetry_sanity_check(self):
-        num_range = range(self.X_seeds.shape[0])
+    def symmetry_sanity_check(self, steps=10000):
         passed = 0
         input1 = np.empty(
-            (1,  ) + self.input_shape )
+            (steps,  ) + self.input_shape )
         input2 = np.empty(
-            (1,  ) + self.input_shape )
-        for pair in combinations(num_range, 2):
-            input1[0], input2[0] = self.X_seeds[pair[0]], self.X_seeds[pair[1]]
-            x = self.model.predict([input1, input2], batch_size = 1)
-            input1[0], input2[0] = self.X_seeds[pair[1]], self.X_seeds[pair[0]]
-            y = self.model.predict([input1, input2], batch_size = 1)
-            passed += int(x==y)
-        return passed / 1770.0 # 1770 = 60 choose 2
+            (steps,  ) + self.input_shape )
+        i_array = np.random.choice(self.X_seeds.shape[0], steps)
+        j_array = np.random.choice(self.X_seeds.shape[0], steps)
+        for k in range(steps):
+            i, j = i_array[k], j_array[k]
+            input1[k], input2[k] = self.X_seeds[i], self.X_seeds[j]
+        x = self.model.predict([input1, input2], batch_size = steps)
+        y = self.model.predict([input2, input1], batch_size = steps)
+        return 1.0 - (np.sum(np.abs(x-y)) / steps)
 
 def to_sparse_labels(labels):
     assert labels.shape[1] == 2
@@ -273,11 +271,11 @@ class Classifier():
         # model is a softmax 10-class classifier
         internalmodel = Sequential()
         internalmodel.add(Dense(64, activation='relu', input_dim=self.input_shape))
-        internalmodel.add(Dropout(0.5))
+        internalmodel.add(Dropout(0.25))
         internalmodel.add(Dense(64, activation='relu'))
-        internalmodel.add(Dropout(0.5))
+        internalmodel.add(Dropout(0.25))
         internalmodel.add(Dense(10, activation='softmax'))
-        sgd = SGD(lr=0.01, decay=1e-6, momentum=0.9, nesterov=True)
+        sgd = SGD(lr=0.1, decay=1e-6, momentum=0.9, nesterov=True)
         # TODO, compare to ADAM
         internalmodel.compile(loss='categorical_crossentropy',
                       optimizer=sgd,
@@ -289,7 +287,7 @@ class Classifier():
         self.model = internalmodel
 
     # fits the model
-    def fit(self, steps = 10000, epochs = 10, save=True):
+    def fit(self, steps = 10000, epochs = 20, save=True):
         if self.model is None:
             print('Must create model first')
             self.create_model()
@@ -374,15 +372,16 @@ class FatSiameseModel():
         self.seeds = seeds
         self.s_matrix = seed_matrix(seeds)
         self.fname = os.path.join('Modules', (name + '.hdf5'))
-        self.label_name = name + '.csv  '
+        self.label_name = name + '.csv'
         self.batch_size = batch_size
         self.dense = dense # Do we use the combinations for the model?
 
         # Propogated data
-        self.fat_X_seeds, self.fat_s_matrix = self.propagate()
+        self.fat_X_seeds, self.fat_s_matrix = None, None
+        self.propagate()
 
-        print(fat_s_matrix)
-        
+        # print(self.fat_s_matrix)
+
         self.model = None
 
     # expands the data based on the seeds and linear combinations
@@ -393,21 +392,21 @@ class FatSiameseModel():
         for i, val in enumerate(self.seeds):
             table[val[1], counters[val[1]]] = i
             counters[val[1]] += 1
-        assert len(counters[counters==6]) == 10, str(counters)
-        assert np.min(table) > 0, str(table)
+        assert all([i == 6 for i in counters]), str(counters)
+        assert np.min(table) >= 0 and np.max(table) < 60, str(table)
 
         # precalced the size, 630 per label * 10 --> 630
-        self.fat_X_seeds = np.zeros((630, self.X_seeds.shape[1]))
+        # self.fat_X_seeds = np.zeros((630, self.X_seeds.shape[1]))
         self.fat_s_matrix = np.zeros((630, 630), dtype='int') # is a block diagonal matrix
+        output = []
         for label in range(10):
-            output = []
             a, b = 63 * (label), 63 * (1+label)
-            assert len(output) == a, str(output)
+            assert len(output) == a, '{} {} {}'.format(a, len(output), label)
             for r in range(1,7):
                 for index_set in combinations(table[label],r):
                     avg = np.zeros(self.X_seeds.shape[1])
                     for i in index_set:
-                        avg += self.X_seed[i]
+                        avg += self.X_seeds[i]
                     output.append(avg/r)
 
             assert len(output) == b, str(output)
@@ -415,6 +414,7 @@ class FatSiameseModel():
 
         self.fat_X_seeds = np.array(output)
         assert self.fat_X_seeds.shape == (630,self.X_seeds.shape[1]), str(self.fat_X_seeds)
+        assert np.sum(self.fat_s_matrix) == (63*63*10)
 
 
 
@@ -462,13 +462,16 @@ class FatSiameseModel():
             self.create_model()
 
         self.model.fit_generator(self.training_generator(), steps, epochs=epochs,
-                                validation_data=self.validation_generator())
+                                validation_data=self.validation_generator(), validation_steps=steps//10)
 
         if save:
             self.model.save_weights(self.fname)
 
     # Runs sanity checks on the model
     def evaluate(self):
+        if self.model is None:
+            print('Must create model first')
+            self.create_model()
         print('Performing sanity check: ([x,x]) => 1')
         print('\nSanity Check : {}'.format('Passed' if self.siamese_sanity_check() == 1.0 else 'Failed'))
 
@@ -515,13 +518,13 @@ class FatSiameseModel():
             if save:
                 print('Also saving them')
                 np.savetxt('All{}'.format(self.label_name), np.asarray(labels), delimiter=',', fmt='%d')
-                np.savetxt('Results{}'.format(self.label_name), np.asarray(labels[6000:]), delimiter=',', fmt='%d')
+                np.savetxt('Results{}'.format(self.label_name), np.asarray(labels[6000:]), delimiter=',', fmt='%d',  header='Id,Label')
             return labels, labels[6000:]
         else:
             if verbose: print('Returning {} labels'.format(labels.shape[0]))
             if save:
                 print('Also saving them')
-                np.savetxt('{}'.format(self.label_name), np.asarray(labels), delimiter=',', fmt='%d')
+                np.savetxt('{}'.format(self.label_name), np.asarray(labels), delimiter=',', fmt='%d',  header='Id,Label')
             return labels
 
     # modified to use fat seeds
@@ -577,17 +580,17 @@ class FatSiameseModel():
     # the same result
     # same result given the [y,x] == [x,y] property
     # TODO, change so all predictions are done at once
-    def symmetry_sanity_check(self):
-        num_range = range(self.fat_X_seeds.shape[0])
+    def symmetry_sanity_check(self, steps=10000):
         passed = 0
         input1 = np.empty(
-            (1,  ) + self.input_shape )
+            (steps,  ) + self.input_shape )
         input2 = np.empty(
-            (1,  ) + self.input_shape )
-        for pair in combinations(num_range, 2):
-            input1[0], input2[0] = self.fat_X_seeds[pair[0]], self.fat_X_seeds[pair[1]]
-            x = self.model.predict([input1, input2], batch_size = 1)
-            input1[0], input2[0] = self.fat_X_seeds[pair[1]], self.fat_X_seeds[pair[0]]
-            y = self.model.predict([input1, input2], batch_size = 1)
-            passed += int(x==y)
-        return passed * factorial(num_range-2) * 2. / (factorial(num_range)) # 1770 = 60 choose 2
+            (steps,  ) + self.input_shape )
+        i_array = np.random.choice(self.fat_X_seeds.shape[0], steps)
+        j_array = np.random.choice(self.fat_X_seeds.shape[0], steps)
+        for k in range(steps):
+            i, j = i_array[k], j_array[k]
+            input1[k], input2[k] = self.fat_X_seeds[i], self.fat_X_seeds[j]
+        x = self.model.predict([input1, input2], batch_size = steps)
+        y = self.model.predict([input2, input1], batch_size = steps)
+        return 1.0 - (np.sum(np.abs(x-y)) / steps)
